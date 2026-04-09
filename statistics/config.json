@@ -1,0 +1,30 @@
+{
+    "simulation": {
+        "N": 100,
+        "dt": 0.04,
+        "t_stop": 100,
+        "save_interval": 250,
+        "num_runs": 2
+    },
+    "snapshot_times": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+    "histogram_times": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+    "physics": {
+        "radii_range": [2.5e-6, 7.5e-6],
+        "water_volume_content": 0.02,
+        "eps_oil": 2.85,
+        "eta_oil": 0.065,
+        "eta_water": 0.001,
+        "rho_water": 1000,
+        "rho_oil": 900,
+        "E": 3e5,
+        "boundary_mode": "open"
+    },
+    "tree": {
+        "theta": 0.25,
+        "mpl": 16
+    },
+    "taichi": {
+        "arch": "cpu",
+        "cpu_max_num_threads": 16
+    }
+}

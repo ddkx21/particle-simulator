@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Results & data (keep directories, ignore contents)
+results/*
+!results/.gitkeep
+!results/plots/
+results/plots/*
+!results/plots/.gitkeep
+!results/euler_error/
+results/euler_error/*
+!results/euler_error/.gitkeep
+
+# Benchmark plots (generated)
+benchmarks/plots/*
+!benchmarks/plots/.gitkeep
+
+# Statistics output (generated)
+statistics/results/*
+statistics/plots/*
+!statistics/results/.gitkeep
+!statistics/plots/.gitkeep
+
+# Large data files
+*.npz
+*.xlsx
+*.prof
+*.csv
+
+# Images (generated)
+*.png
+*.gif
+
+# Obsidian
+.obsidian/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# DOCS
+docs/

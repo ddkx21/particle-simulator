@@ -1,0 +1,11 @@
+{
+    "L": 1e-3,
+    "R": 1e-6,
+    "E0": 1e5,
+    "eps_0": 8.854187817e-12,
+    "eps_r": 1,
+    "eta": 0.065,
+    "rho_m": 1000,
+    "velocity_file": "U_lattice.txt",
+    "grid_resolution": 48
+}
