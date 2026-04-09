@@ -18,6 +18,12 @@ results/plots/*
 !results/euler_error/
 results/euler_error/*
 !results/euler_error/.gitkeep
+!results/boundary_benchmark/
+results/boundary_benchmark/*
+!results/boundary_benchmark/.gitkeep
+!results/boundary_benchmark/plots/
+results/boundary_benchmark/plots/*
+!results/boundary_benchmark/plots/.gitkeep
 
 # Benchmark plots (generated)
 benchmarks/plots/*
