@@ -94,6 +94,13 @@ def savefig(name):
 #  Графики для каждого dt
 # ============================================================
 
+def _get_time_series(data, light_key, sparse_key):
+    """Возвращает (times, values) — предпочитает light_* если доступно."""
+    if light_key in data and "light_times" in data:
+        return data["light_times"], data[light_key]
+    return data["snapshot_times"], data[sparse_key]
+
+
 def plot_droplet_count_vs_time(results, dt):
     """График 1: N(t) для 4 конфигураций."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -103,8 +110,9 @@ def plot_droplet_count_vs_time(results, dt):
         if key not in results:
             continue
         data = results[key]
-        t_arr = data["snapshot_times"]
-        counts = data["droplet_counts"]  # (NUM_RUNS, num_snapshots)
+        t_arr, counts = _get_time_series(
+            data, "light_droplet_counts", "droplet_counts"
+        )
 
         s = STYLE[(method, boundary)]
         mean = counts.mean(axis=0).astype(float)
@@ -114,6 +122,8 @@ def plot_droplet_count_vs_time(results, dt):
         ax.fill_between(t_arr, mean - std, mean + std,
                         color=s["color"], alpha=0.12)
 
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("Время, сек")
     ax.set_ylabel("Количество капель")
     ax.set_title(f"Количество капель N(t), dt={dt}")
@@ -130,8 +140,7 @@ def plot_mean_radius_vs_time(results, dt):
         if key not in results:
             continue
         data = results[key]
-        t_arr = data["snapshot_times"]
-        mr = data["mean_radii"]  # (NUM_RUNS, num_snapshots)
+        t_arr, mr = _get_time_series(data, "light_mean_radii", "mean_radii")
 
         s = STYLE[(method, boundary)]
         mean = mr.mean(axis=0) * 1e6
@@ -141,6 +150,8 @@ def plot_mean_radius_vs_time(results, dt):
         ax.fill_between(t_arr, mean - std, mean + std,
                         color=s["color"], alpha=0.12)
 
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("Время, сек")
     ax.set_ylabel("Средний радиус, мкм")
     ax.set_title(f"Средний радиус <r>(t), dt={dt}")
@@ -157,8 +168,7 @@ def plot_median_radius_vs_time(results, dt):
         if key not in results:
             continue
         data = results[key]
-        t_arr = data["snapshot_times"]
-        mr = data["median_radii"]
+        t_arr, mr = _get_time_series(data, "light_median_radii", "median_radii")
 
         s = STYLE[(method, boundary)]
         mean = mr.mean(axis=0) * 1e6
@@ -168,6 +178,8 @@ def plot_median_radius_vs_time(results, dt):
         ax.fill_between(t_arr, mean - std, mean + std,
                         color=s["color"], alpha=0.12)
 
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("Время, сек")
     ax.set_ylabel("Медианный радиус, мкм")
     ax.set_title(f"Медианный радиус(t), dt={dt}")
@@ -209,6 +221,8 @@ def plot_kde_distributions(results, dt):
             ax.plot(r_grid, kde(r_grid), color=s["color"], ls=s["ls"],
                     label=s["label"], linewidth=1.3)
 
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
         ax.set_title(f"t = {t_val} сек")
         ax.set_xlabel("Радиус, мкм")
         ax.set_ylabel("Плотность")
@@ -218,6 +232,169 @@ def plot_kde_distributions(results, dt):
 
     fig.suptitle(f"Распределение по радиусам (KDE), dt={dt}", fontsize=14)
     savefig(f"kde_distributions_dt{dt}")
+
+
+def plot_coalescence_rate(results, dt):
+    """График 5: dN/dt — скорость коалесценции."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method, boundary in CONFIGS:
+        key = (method, boundary, dt)
+        if key not in results:
+            continue
+        data = results[key]
+        t_arr, counts = _get_time_series(
+            data, "light_droplet_counts", "droplet_counts"
+        )
+        counts_f = counts.astype(float)
+        mean_counts = counts_f.mean(axis=0)
+
+        # Численная производная (центральная разность)
+        dt_metric = float(t_arr[1] - t_arr[0]) if len(t_arr) > 1 else 1.0
+        dN_dt = np.gradient(mean_counts, dt_metric)
+
+        s = STYLE[(method, boundary)]
+        ax.plot(t_arr, -dN_dt, color=s["color"], ls=s["ls"], label=s["label"])
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Время, сек")
+    ax.set_ylabel("-dN/dt, капель/сек")
+    ax.set_title(f"Скорость коалесценции, dt={dt}")
+    ax.legend()
+    savefig(f"coalescence_rate_dt{dt}")
+
+
+def plot_volume_conservation(results, dt):
+    """График 6: V(t)/V(0) — проверка сохранения объёма."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method, boundary in CONFIGS:
+        key = (method, boundary, dt)
+        if key not in results:
+            continue
+        data = results[key]
+
+        if "light_volume_ratio" not in data:
+            continue
+
+        t_arr = data["light_times"]
+        vr = data["light_volume_ratio"]  # (num_runs, num_points)
+
+        s = STYLE[(method, boundary)]
+        mean = vr.mean(axis=0)
+        std = vr.std(axis=0)
+
+        ax.plot(t_arr, mean, color=s["color"], ls=s["ls"], label=s["label"])
+        ax.fill_between(t_arr, mean - std, mean + std,
+                        color=s["color"], alpha=0.12)
+
+    ax.set_xlim(left=0)
+    ax.axhline(y=1.0, color="black", ls=":", alpha=0.5, label="V(0)")
+    ax.set_xlabel("Время, сек")
+    ax.set_ylabel("V(t) / V(0)")
+    ax.set_title(f"Сохранение объёма, dt={dt}")
+    ax.legend()
+    savefig(f"volume_conservation_dt{dt}")
+
+
+def plot_cumulative_collisions(results, dt):
+    """График 7: Кумулятивное число столкновений."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method, boundary in CONFIGS:
+        key = (method, boundary, dt)
+        if key not in results:
+            continue
+        data = results[key]
+
+        if "light_cumulative_collisions" not in data:
+            continue
+
+        t_arr = data["light_times"]
+        cc = data["light_cumulative_collisions"].astype(float)
+
+        s = STYLE[(method, boundary)]
+        mean = cc.mean(axis=0)
+        std = cc.std(axis=0)
+
+        ax.plot(t_arr, mean, color=s["color"], ls=s["ls"], label=s["label"])
+        ax.fill_between(t_arr, mean - std, mean + std,
+                        color=s["color"], alpha=0.12)
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Время, сек")
+    ax.set_ylabel("Кумулятивное число столкновений")
+    ax.set_title(f"Кумулятивные столкновения, dt={dt}")
+    ax.legend()
+    savefig(f"cumulative_collisions_dt{dt}")
+
+
+def plot_polydispersity(results, dt):
+    """График 8: Коэффициент полидисперсности std(r)/mean(r)."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method, boundary in CONFIGS:
+        key = (method, boundary, dt)
+        if key not in results:
+            continue
+        data = results[key]
+
+        if "light_polydispersity" not in data:
+            continue
+
+        t_arr = data["light_times"]
+        pd = data["light_polydispersity"]
+
+        s = STYLE[(method, boundary)]
+        mean = pd.mean(axis=0)
+        std = pd.std(axis=0)
+
+        ax.plot(t_arr, mean, color=s["color"], ls=s["ls"], label=s["label"])
+        ax.fill_between(t_arr, mean - std, mean + std,
+                        color=s["color"], alpha=0.12)
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Время, сек")
+    ax.set_ylabel("std(r) / mean(r)")
+    ax.set_title(f"Коэффициент полидисперсности, dt={dt}")
+    ax.legend()
+    savefig(f"polydispersity_dt{dt}")
+
+
+def plot_max_radius(results, dt):
+    """График 9: Максимальный радиус r_max(t)."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method, boundary in CONFIGS:
+        key = (method, boundary, dt)
+        if key not in results:
+            continue
+        data = results[key]
+
+        if "light_max_radii" not in data:
+            continue
+
+        t_arr = data["light_times"]
+        mr = data["light_max_radii"]
+
+        s = STYLE[(method, boundary)]
+        mean = mr.mean(axis=0) * 1e6
+        std = mr.std(axis=0) * 1e6
+
+        ax.plot(t_arr, mean, color=s["color"], ls=s["ls"], label=s["label"])
+        ax.fill_between(t_arr, mean - std, mean + std,
+                        color=s["color"], alpha=0.12)
+
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Время, сек")
+    ax.set_ylabel("r_max, мкм")
+    ax.set_title(f"Максимальный радиус r_max(t), dt={dt}")
+    ax.legend()
+    savefig(f"max_radius_dt{dt}")
 
 
 # ============================================================
@@ -252,6 +429,7 @@ def plot_convergence_droplet_count(results):
         ax.errorbar(dts, means, yerr=stds, color=s["color"], ls=s["ls"],
                      marker="o", label=s["label"], capsize=3)
 
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("dt")
     ax.set_ylabel(f"N капель при t={int(results[next(iter(results))]['snapshot_times'][-1])}")
     ax.set_xscale("log")
@@ -288,6 +466,7 @@ def plot_convergence_mean_radius(results):
         ax.errorbar(dts, means, yerr=stds, color=s["color"], ls=s["ls"],
                      marker="o", label=s["label"], capsize=3)
 
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("dt")
     ax.set_ylabel("Средний радиус при t_stop, мкм")
     ax.set_xscale("log")
@@ -328,6 +507,7 @@ def plot_timing_comparison(results):
                        color=s["color"], alpha=0.7 if "-" in s["ls"] else 0.4,
                        capsize=2)
 
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("dt")
     ax.set_ylabel("Время одного запуска, сек")
     ax.set_title("Сравнение времени расчёта")
@@ -359,11 +539,18 @@ def plot_heatmap_difference(results):
             data_open = results[key_open]
             data_per = results[key_per]
 
-            if snapshot_times is None:
-                snapshot_times = data_open["snapshot_times"]
+            t_open, counts_open = _get_time_series(
+                data_open, "light_droplet_counts", "droplet_counts"
+            )
+            t_per, counts_per = _get_time_series(
+                data_per, "light_droplet_counts", "droplet_counts"
+            )
 
-            mean_open = data_open["droplet_counts"].mean(axis=0).astype(float)
-            mean_per = data_per["droplet_counts"].mean(axis=0).astype(float)
+            if snapshot_times is None:
+                snapshot_times = t_open
+
+            mean_open = counts_open.mean(axis=0).astype(float)
+            mean_per = counts_per.mean(axis=0).astype(float)
 
             # Относительная разность в %
             denom = np.maximum(mean_open, 1.0)
@@ -421,6 +608,11 @@ def main():
         plot_mean_radius_vs_time(results, dt)
         plot_median_radius_vs_time(results, dt)
         plot_kde_distributions(results, dt)
+        plot_coalescence_rate(results, dt)
+        plot_volume_conservation(results, dt)
+        plot_cumulative_collisions(results, dt)
+        plot_polydispersity(results, dt)
+        plot_max_radius(results, dt)
 
     # Сводные графики
     print("\nСводные графики:")
