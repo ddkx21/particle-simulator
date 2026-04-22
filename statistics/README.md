@@ -30,7 +30,10 @@ python statistics/run_direct.py
 python statistics/run_tree.py
 
 # 2. Построить графики
-python statistics/plot_statistics.py
+python statistics/plot_statistics.py                # авто-определение (строит по доступным .npz)
+python statistics/plot_statistics.py --direct        # только direct-метод
+python statistics/plot_statistics.py --tree           # только tree-метод
+python statistics/plot_statistics.py --direct --tree  # сравнение обоих методов
 ```
 
 ## Конфигурация
@@ -73,6 +76,17 @@ python statistics/plot_statistics.py
 - **radii_distribution.png** — сводный 2×3 subplots для всех `histogram_times`
 - **radii_histogram_t{T}.png** — отдельная bar-гистограмма для момента t=T (усреднённая по реализациям, errorbar ± std)
 - **radii_kde_t{T}.png** — непрерывная KDE-оценка плотности для t=T (gaussian_kde по объединённым данным, заливка ± std по реализациям)
+
+### Одиночный режим
+
+При построении графиков только для одного метода (`--direct` или `--tree`) имена файлов содержат суффикс метода:
+
+- **droplet_count_direct.png** / **droplet_count_tree.png**
+- **median_radius_direct.png** / **median_radius_tree.png**
+- **timing_direct.png** / **timing_tree.png**
+- **radii_distribution_direct.png** / **radii_distribution_tree.png**
+- **radii_histogram_t{T}_direct.png** / **radii_histogram_t{T}_tree.png**
+- **radii_kde_t{T}_direct.png** / **radii_kde_t{T}_tree.png**
 
 ## Формат .npz
 

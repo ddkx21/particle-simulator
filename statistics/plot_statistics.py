@@ -1,12 +1,17 @@
 """
-Построение графиков статистики: direct vs tree.
+Построение графиков статистики: direct и/или tree.
 
-Читает results/statistics_direct.npz и results/statistics_tree.npz,
+Читает results/statistics_direct.npz и/или results/statistics_tree.npz,
 строит графики в plots/.
 
-Запуск: python statistics/plot_statistics.py
+Запуск:
+  python statistics/plot_statistics.py                # авто-определение
+  python statistics/plot_statistics.py --direct        # только direct
+  python statistics/plot_statistics.py --tree           # только tree
+  python statistics/plot_statistics.py --direct --tree  # сравнение
 """
 
+import argparse
 import os
 import re
 
@@ -22,8 +27,11 @@ PLOTS_DIR = os.path.join(SCRIPT_DIR, "plots")
 
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
+# Цвета для каждого метода
+METHOD_COLORS = {"Direct": "tab:blue", "Tree": "tab:red"}
 
-def load_data(filename):
+
+def load_data(filename: str) -> dict:
     """Загрузка npz и извлечение структурированных данных."""
     path = os.path.join(RESULTS_DIR, filename)
     data = np.load(path)
@@ -64,110 +72,118 @@ def load_data(filename):
     }
 
 
-def plot_droplet_count(direct, tree):
+def _plot_path(base_name: str, datasets: list[tuple[str, dict, str]]) -> str:
+    """Путь к файлу графика: с суффиксом метода для одиночного режима."""
+    if len(datasets) == 1:
+        return os.path.join(PLOTS_DIR, f"{base_name}_{datasets[0][0].lower()}.png")
+    return os.path.join(PLOTS_DIR, f"{base_name}.png")
+
+
+def _total_runs(datasets: list[tuple[str, dict, str]]) -> int:
+    return sum(d["num_runs"] for _, d, _ in datasets)
+
+
+def plot_droplet_count(datasets: list[tuple[str, dict, str]]) -> None:
     """График N(t) с mean +/- std и полупрозрачными реализациями."""
-    t_arr = direct["snapshot_times"]
-    num_runs = direct["num_runs"]
+    t_arr = datasets[0][1]["snapshot_times"]
+    total_runs = _total_runs(datasets)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    for i in range(num_runs):
-        ax.plot(t_arr, direct["droplet_counts"][i], color="tab:blue", alpha=0.1, linewidth=0.5)
-        ax.plot(t_arr, tree["droplet_counts"][i], color="tab:red", alpha=0.1, linewidth=0.5)
+    for label, data, color in datasets:
+        for i in range(data["num_runs"]):
+            ax.plot(t_arr, data["droplet_counts"][i],
+                    color=color, alpha=0.1, linewidth=0.5)
 
-    d_mean = direct["droplet_counts"].mean(axis=0)
-    d_std = direct["droplet_counts"].std(axis=0)
-    t_mean = tree["droplet_counts"].mean(axis=0)
-    t_std = tree["droplet_counts"].std(axis=0)
+        mean = data["droplet_counts"].mean(axis=0)
+        std = data["droplet_counts"].std(axis=0)
 
-    ax.plot(t_arr, d_mean, color="tab:blue", linewidth=2, label="Direct (mean)")
-    ax.fill_between(t_arr, d_mean - d_std, d_mean + d_std, color="tab:blue", alpha=0.2)
-    ax.plot(t_arr, t_mean, color="tab:red", linewidth=2, label="Tree (mean)")
-    ax.fill_between(t_arr, t_mean - t_std, t_mean + t_std, color="tab:red", alpha=0.2)
+        ax.plot(t_arr, mean, color=color, linewidth=2, label=f"{label} (mean)")
+        ax.fill_between(t_arr, mean - std, mean + std, color=color, alpha=0.2)
 
     ax.set_xlabel("Время, сек")
     ax.set_ylabel("Число капель N(t)")
-    ax.set_title(f"Эволюция числа капель ({num_runs} реализаций)")
+    ax.set_title(f"Эволюция числа капель ({total_runs} реализаций)")
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    path = os.path.join(PLOTS_DIR, "droplet_count.png")
+    path = _plot_path("droplet_count", datasets)
     fig.savefig(path, dpi=150)
     plt.close(fig)
     print(f"Сохранён: {path}")
 
 
-def plot_median_radius(direct, tree):
+def plot_median_radius(datasets: list[tuple[str, dict, str]]) -> None:
     """График медианного радиуса vs t."""
-    t_arr = direct["snapshot_times"]
-    num_runs = direct["num_runs"]
+    t_arr = datasets[0][1]["snapshot_times"]
+    total_runs = _total_runs(datasets)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    for i in range(num_runs):
-        ax.plot(t_arr, direct["median_radii"][i] * 1e6, color="tab:blue", alpha=0.1, linewidth=0.5)
-        ax.plot(t_arr, tree["median_radii"][i] * 1e6, color="tab:red", alpha=0.1, linewidth=0.5)
+    for label, data, color in datasets:
+        for i in range(data["num_runs"]):
+            ax.plot(t_arr, data["median_radii"][i] * 1e6,
+                    color=color, alpha=0.1, linewidth=0.5)
 
-    d_mean = direct["median_radii"].mean(axis=0) * 1e6
-    d_std = direct["median_radii"].std(axis=0) * 1e6
-    t_mean = tree["median_radii"].mean(axis=0) * 1e6
-    t_std = tree["median_radii"].std(axis=0) * 1e6
+        mean = data["median_radii"].mean(axis=0) * 1e6
+        std = data["median_radii"].std(axis=0) * 1e6
 
-    ax.plot(t_arr, d_mean, color="tab:blue", linewidth=2, label="Direct (mean)")
-    ax.fill_between(t_arr, d_mean - d_std, d_mean + d_std, color="tab:blue", alpha=0.2)
-    ax.plot(t_arr, t_mean, color="tab:red", linewidth=2, label="Tree (mean)")
-    ax.fill_between(t_arr, t_mean - t_std, t_mean + t_std, color="tab:red", alpha=0.2)
+        ax.plot(t_arr, mean, color=color, linewidth=2, label=f"{label} (mean)")
+        ax.fill_between(t_arr, mean - std, mean + std, color=color, alpha=0.2)
 
     ax.set_xlabel("Время, сек")
     ax.set_ylabel("Медианный радиус, мкм")
-    ax.set_title(f"Эволюция медианного радиуса ({num_runs} реализаций)")
+    ax.set_title(f"Эволюция медианного радиуса ({total_runs} реализаций)")
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    path = os.path.join(PLOTS_DIR, "median_radius.png")
+    path = _plot_path("median_radius", datasets)
     fig.savefig(path, dpi=150)
     plt.close(fig)
     print(f"Сохранён: {path}")
 
 
-def plot_timing(direct, tree):
+def plot_timing(datasets: list[tuple[str, dict, str]]) -> None:
     """Boxplot времени расчёта."""
-    direct_times = direct["elapsed_times"]
-    tree_times = tree["elapsed_times"]
+    labels = [label for label, _, _ in datasets]
+    times_list = [data["elapsed_times"] for _, data, _ in datasets]
+    colors = [color for _, _, color in datasets]
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    bp = ax.boxplot(
-        [direct_times, tree_times],
-        tick_labels=["Direct", "Tree"],
-        patch_artist=True,
-    )
-    bp["boxes"][0].set_facecolor("tab:blue")
-    bp["boxes"][0].set_alpha(0.5)
-    bp["boxes"][1].set_facecolor("tab:red")
-    bp["boxes"][1].set_alpha(0.5)
+    bp = ax.boxplot(times_list, tick_labels=labels, patch_artist=True)
 
+    for box, color in zip(bp["boxes"], colors):
+        box.set_facecolor(color)
+        box.set_alpha(0.5)
+
+    title = "Время расчёта: " + " vs ".join(labels)
     ax.set_ylabel("Время расчёта, сек")
-    ax.set_title("Время расчёта: Direct vs Tree")
+    ax.set_title(title)
     ax.grid(True, alpha=0.3, axis="y")
     fig.tight_layout()
 
-    path = os.path.join(PLOTS_DIR, "timing.png")
+    path = _plot_path("timing", datasets)
     fig.savefig(path, dpi=150)
     plt.close(fig)
     print(f"Сохранён: {path}")
 
-    print(f"\nDirect: {direct_times.mean():.1f} ± {direct_times.std():.1f} сек  "
-          f"(min={direct_times.min():.1f}, max={direct_times.max():.1f})")
-    print(f"Tree:   {tree_times.mean():.1f} ± {tree_times.std():.1f} сек  "
-          f"(min={tree_times.min():.1f}, max={tree_times.max():.1f})")
-    if tree_times.mean() > 0:
-        speedup = direct_times.mean() / tree_times.mean()
-        print(f"Ускорение tree/direct: {speedup:.2f}x")
+    for label, data, _ in datasets:
+        t = data["elapsed_times"]
+        print(f"\n{label}: {t.mean():.1f} ± {t.std():.1f} сек  "
+              f"(min={t.min():.1f}, max={t.max():.1f})")
+
+    if len(datasets) == 2:
+        t0 = datasets[0][1]["elapsed_times"].mean()
+        t1 = datasets[1][1]["elapsed_times"].mean()
+        if t1 > 0:
+            print(f"Ускорение {datasets[1][0]}/{datasets[0][0]}: {t0 / t1:.2f}x")
 
 
-def _compute_averaged_histograms(radii_list, bins):
+def _compute_averaged_histograms(
+    radii_list: list[np.ndarray], bins: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Усреднённые гистограммы по реализациям."""
     hists = np.array([
         np.histogram(r, bins=bins, density=True)[0] for r in radii_list
@@ -175,10 +191,10 @@ def _compute_averaged_histograms(radii_list, bins):
     return hists.mean(axis=0), hists.std(axis=0)
 
 
-def plot_radii_distribution(direct, tree):
+def plot_radii_distribution(datasets: list[tuple[str, dict, str]]) -> None:
     """Сводный 2x3 subplots распределения радиусов."""
-    histogram_times = direct["histogram_times"]
-    num_runs = direct["num_runs"]
+    histogram_times = datasets[0][1]["histogram_times"]
+    total_runs = _total_runs(datasets)
 
     n = len(histogram_times)
     ncols = min(n, 3)
@@ -190,20 +206,21 @@ def plot_radii_distribution(direct, tree):
     for idx, t in enumerate(histogram_times):
         ax = axes_flat[idx]
 
-        direct_radii = [r * 1e6 for r in direct["radii_by_time"][t]]
-        tree_radii = [r * 1e6 for r in tree["radii_by_time"][t]]
+        # Собираем все радиусы для определения общих bins
+        all_radii_parts = []
+        for _, data, _ in datasets:
+            all_radii_parts.extend([r * 1e6 for r in data["radii_by_time"][t]])
 
-        all_radii = np.concatenate(direct_radii + tree_radii)
+        all_radii = np.concatenate(all_radii_parts)
         bins = np.linspace(all_radii.min(), all_radii.max(), 31)
         bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
-        d_mean, d_std = _compute_averaged_histograms(direct_radii, bins)
-        t_mean, t_std = _compute_averaged_histograms(tree_radii, bins)
-
-        ax.plot(bin_centers, d_mean, color="tab:blue", linewidth=1.5, label="Direct")
-        ax.fill_between(bin_centers, d_mean - d_std, d_mean + d_std, color="tab:blue", alpha=0.2)
-        ax.plot(bin_centers, t_mean, color="tab:red", linewidth=1.5, label="Tree")
-        ax.fill_between(bin_centers, t_mean - t_std, t_mean + t_std, color="tab:red", alpha=0.2)
+        for label, data, color in datasets:
+            radii = [r * 1e6 for r in data["radii_by_time"][t]]
+            mean, std = _compute_averaged_histograms(radii, bins)
+            ax.plot(bin_centers, mean, color=color, linewidth=1.5, label=label)
+            ax.fill_between(bin_centers, mean - std, mean + std,
+                            color=color, alpha=0.2)
 
         ax.set_title(f"t = {t} сек")
         ax.set_xlabel("Радиус, мкм")
@@ -212,134 +229,185 @@ def plot_radii_distribution(direct, tree):
             ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
 
-    # Скрываем лишние субплоты, если histogram_times < 6
     for idx in range(len(histogram_times), len(axes_flat)):
         axes_flat[idx].set_visible(False)
 
-    fig.suptitle(f"Распределение по радиусам ({num_runs} реализаций)", fontsize=14)
+    fig.suptitle(f"Распределение по радиусам ({total_runs} реализаций)", fontsize=14)
     fig.tight_layout()
 
-    path = os.path.join(PLOTS_DIR, "radii_distribution.png")
+    path = _plot_path("radii_distribution", datasets)
     fig.savefig(path, dpi=150)
     plt.close(fig)
     print(f"Сохранён: {path}")
 
 
-def plot_radii_histograms_individual(direct, tree):
+def plot_radii_histograms_individual(
+    datasets: list[tuple[str, dict, str]]
+) -> None:
     """Отдельные гистограммы для каждого histogram_time."""
-    histogram_times = direct["histogram_times"]
-    num_runs = direct["num_runs"]
+    histogram_times = datasets[0][1]["histogram_times"]
+    total_runs = _total_runs(datasets)
+    n_datasets = len(datasets)
 
     for t in histogram_times:
-        direct_radii = [r * 1e6 for r in direct["radii_by_time"][t]]
-        tree_radii = [r * 1e6 for r in tree["radii_by_time"][t]]
+        # Общие bins
+        all_radii_parts = []
+        for _, data, _ in datasets:
+            all_radii_parts.extend([r * 1e6 for r in data["radii_by_time"][t]])
 
-        all_radii = np.concatenate(direct_radii + tree_radii)
+        all_radii = np.concatenate(all_radii_parts)
         bins = np.linspace(all_radii.min(), all_radii.max(), 31)
         bin_centers = 0.5 * (bins[:-1] + bins[1:])
         bin_width = bins[1] - bins[0]
 
-        d_mean, d_std = _compute_averaged_histograms(direct_radii, bins)
-        t_mean, t_std = _compute_averaged_histograms(tree_radii, bins)
-
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        ax.bar(bin_centers - bin_width * 0.2, d_mean, width=bin_width * 0.4,
-               color="tab:blue", alpha=0.7, label="Direct (mean)")
-        ax.errorbar(bin_centers - bin_width * 0.2, d_mean, yerr=d_std,
-                     fmt="none", ecolor="tab:blue", alpha=0.5, capsize=2)
-
-        ax.bar(bin_centers + bin_width * 0.2, t_mean, width=bin_width * 0.4,
-               color="tab:red", alpha=0.7, label="Tree (mean)")
-        ax.errorbar(bin_centers + bin_width * 0.2, t_mean, yerr=t_std,
-                     fmt="none", ecolor="tab:red", alpha=0.5, capsize=2)
+        if n_datasets == 1:
+            label, data, color = datasets[0]
+            radii = [r * 1e6 for r in data["radii_by_time"][t]]
+            mean, std = _compute_averaged_histograms(radii, bins)
+            ax.bar(bin_centers, mean, width=bin_width * 0.8,
+                   color=color, alpha=0.7, label=f"{label} (mean)")
+            ax.errorbar(bin_centers, mean, yerr=std,
+                        fmt="none", ecolor=color, alpha=0.5, capsize=2)
+        else:
+            for i, (label, data, color) in enumerate(datasets):
+                offset = (i - 0.5) * bin_width * 0.4
+                radii = [r * 1e6 for r in data["radii_by_time"][t]]
+                mean, std = _compute_averaged_histograms(radii, bins)
+                ax.bar(bin_centers + offset, mean, width=bin_width * 0.4,
+                       color=color, alpha=0.7, label=f"{label} (mean)")
+                ax.errorbar(bin_centers + offset, mean, yerr=std,
+                            fmt="none", ecolor=color, alpha=0.5, capsize=2)
 
         ax.set_xlabel("Радиус, мкм")
         ax.set_ylabel("Плотность")
-        ax.set_title(f"Гистограмма радиусов, t = {t} сек ({num_runs} реализаций)")
+        ax.set_title(f"Гистограмма радиусов, t = {t} сек ({total_runs} реализаций)")
         ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
         fig.tight_layout()
 
-        path = os.path.join(PLOTS_DIR, f"radii_histogram_t{t}.png")
+        path = _plot_path(f"radii_histogram_t{t}", datasets)
         fig.savefig(path, dpi=150)
         plt.close(fig)
         print(f"Сохранён: {path}")
 
 
-def plot_radii_kde_individual(direct, tree):
+def plot_radii_kde_individual(
+    datasets: list[tuple[str, dict, str]]
+) -> None:
     """Отдельные KDE-графики для каждого histogram_time."""
-    histogram_times = direct["histogram_times"]
-    num_runs = direct["num_runs"]
+    histogram_times = datasets[0][1]["histogram_times"]
+    total_runs = _total_runs(datasets)
 
     for t in histogram_times:
-        direct_radii = [r * 1e6 for r in direct["radii_by_time"][t]]
-        tree_radii = [r * 1e6 for r in tree["radii_by_time"][t]]
-
-        # Объединённые данные всех реализаций для KDE
-        direct_all = np.concatenate(direct_radii)
-        tree_all = np.concatenate(tree_radii)
-        all_radii = np.concatenate([direct_all, tree_all])
-
+        # Общая сетка x
+        all_radii_parts = []
+        for _, data, _ in datasets:
+            all_radii_parts.extend([r * 1e6 for r in data["radii_by_time"][t]])
+        all_radii = np.concatenate(all_radii_parts)
         x_grid = np.linspace(all_radii.min() * 0.95, all_radii.max() * 1.05, 200)
 
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        # KDE по объединённым данным
-        kde_direct = gaussian_kde(direct_all)
-        kde_tree = gaussian_kde(tree_all)
+        for label, data, color in datasets:
+            radii_um = [r * 1e6 for r in data["radii_by_time"][t]]
+            combined = np.concatenate(radii_um)
 
-        y_direct = kde_direct(x_grid)
-        y_tree = kde_tree(x_grid)
+            kde = gaussian_kde(combined)
+            y = kde(x_grid)
+            ax.plot(x_grid, y, color=color, linewidth=2, label=label)
 
-        ax.plot(x_grid, y_direct, color="tab:blue", linewidth=2, label="Direct")
-        ax.plot(x_grid, y_tree, color="tab:red", linewidth=2, label="Tree")
-
-        # Полоса ±std по отдельным реализациям (KDE каждой реализации)
-        if num_runs > 1:
-            direct_kdes = np.array([gaussian_kde(r)(x_grid) for r in direct_radii])
-            tree_kdes = np.array([gaussian_kde(r)(x_grid) for r in tree_radii])
-
-            d_mean_kde = direct_kdes.mean(axis=0)
-            d_std_kde = direct_kdes.std(axis=0)
-            t_mean_kde = tree_kdes.mean(axis=0)
-            t_std_kde = tree_kdes.std(axis=0)
-
-            ax.fill_between(x_grid, d_mean_kde - d_std_kde, d_mean_kde + d_std_kde,
-                            color="tab:blue", alpha=0.15)
-            ax.fill_between(x_grid, t_mean_kde - t_std_kde, t_mean_kde + t_std_kde,
-                            color="tab:red", alpha=0.15)
+            if data["num_runs"] > 1:
+                kdes = np.array([gaussian_kde(r)(x_grid) for r in radii_um])
+                mean_kde = kdes.mean(axis=0)
+                std_kde = kdes.std(axis=0)
+                ax.fill_between(x_grid, mean_kde - std_kde, mean_kde + std_kde,
+                                color=color, alpha=0.15)
 
         ax.set_xlabel("Радиус, мкм")
         ax.set_ylabel("Плотность")
-        ax.set_title(f"KDE распределения радиусов, t = {t} сек ({num_runs} реализаций)")
+        ax.set_title(f"KDE распределения радиусов, t = {t} сек "
+                     f"({total_runs} реализаций)")
         ax.legend()
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
 
-        path = os.path.join(PLOTS_DIR, f"radii_kde_t{t}.png")
+        path = _plot_path(f"radii_kde_t{t}", datasets)
         fig.savefig(path, dpi=150)
         plt.close(fig)
         print(f"Сохранён: {path}")
 
 
-def main():
-    print("Загрузка данных...")
-    direct = load_data("statistics_direct.npz")
-    tree = load_data("statistics_tree.npz")
+def _build_datasets(
+    methods: list[str],
+) -> list[tuple[str, dict, str]]:
+    """Загрузка данных и формирование списка datasets."""
+    filemap = {
+        "direct": ("Direct", "statistics_direct.npz"),
+        "tree": ("Tree", "statistics_tree.npz"),
+    }
+    datasets = []
+    for method in methods:
+        label, filename = filemap[method]
+        path = os.path.join(RESULTS_DIR, filename)
+        if not os.path.isfile(path):
+            raise FileNotFoundError(
+                f"Файл не найден: {path}\n"
+                f"Сначала запустите: python statistics/run_{method}.py"
+            )
+        data = load_data(filename)
+        color = METHOD_COLORS[label]
+        datasets.append((label, data, color))
+        print(f"{label}: {data['num_runs']} реализаций, "
+              f"histogram_times={data['histogram_times']}")
+    return datasets
 
-    print(f"Direct: {direct['num_runs']} реализаций, "
-          f"histogram_times={direct['histogram_times']}")
-    print(f"Tree:   {tree['num_runs']} реализаций, "
-          f"histogram_times={tree['histogram_times']}")
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Построение графиков статистики симуляций."
+    )
+    parser.add_argument(
+        "--direct", action="store_true",
+        help="Включить данные direct-метода",
+    )
+    parser.add_argument(
+        "--tree", action="store_true",
+        help="Включить данные tree-метода",
+    )
+    args = parser.parse_args()
+
+    # Если ни один флаг не указан — автодетект
+    if not args.direct and not args.tree:
+        methods = []
+        for method, filename in [("direct", "statistics_direct.npz"),
+                                 ("tree", "statistics_tree.npz")]:
+            if os.path.isfile(os.path.join(RESULTS_DIR, filename)):
+                methods.append(method)
+        if not methods:
+            parser.error(
+                "Не найдено ни одного файла результатов в "
+                f"{RESULTS_DIR}/.\n"
+                "Сначала запустите run_direct.py и/или run_tree.py."
+            )
+    else:
+        methods = []
+        if args.direct:
+            methods.append("direct")
+        if args.tree:
+            methods.append("tree")
+
+    print("Загрузка данных...")
+    datasets = _build_datasets(methods)
     print()
 
-    plot_droplet_count(direct, tree)
-    plot_median_radius(direct, tree)
-    plot_timing(direct, tree)
-    plot_radii_distribution(direct, tree)
-    plot_radii_histograms_individual(direct, tree)
-    plot_radii_kde_individual(direct, tree)
+    plot_droplet_count(datasets)
+    plot_median_radius(datasets)
+    plot_timing(datasets)
+    plot_radii_distribution(datasets)
+    plot_radii_histograms_individual(datasets)
+    plot_radii_kde_individual(datasets)
 
     print("\nВсе графики построены!")
 
