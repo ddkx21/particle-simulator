@@ -25,6 +25,10 @@ results/boundary_benchmark/*
 results/boundary_benchmark/plots/*
 !results/boundary_benchmark/plots/.gitkeep
 
+# Convergence test results (generated)
+convergence_test/results/*
+!convergence_test/results/.gitkeep
+
 # Benchmark plots (generated)
 benchmarks/plots/*
 !benchmarks/plots/.gitkeep
