@@ -92,13 +92,13 @@ class TreeDropletForceCalculator(ForceCalculator):
             self.num_particles = n
             # Перезагрузка поправки в новое дерево
             if self._correction is not None:
-                self.octree.load_periodic_correction(self._correction, self._correction_L_sim)
+                self.octree.load_periodic_correction(self._correction, self._correction_L_sim, eta_sim=self.eta_oil)
 
     def load_periodic_correction(self, correction, L_sim: float):
         """Загрузка данных периодической поправки COMSOL."""
         self._correction = correction
         self._correction_L_sim = L_sim
-        self.octree.load_periodic_correction(correction, L_sim)
+        self.octree.load_periodic_correction(correction, L_sim, eta_sim=self.eta_oil)
 
     def calculate(self,
                   positions: np.ndarray,   # форма (N, 3), float64

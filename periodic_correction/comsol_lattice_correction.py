@@ -44,21 +44,24 @@ class COMSOLLatticeCorrection:
         eps_0 = params["eps_0"]
         eps_r = params["eps_r"]
         Fz_comsol = 4 * np.pi * R**2 * eps_0 * eps_r * E0**2
+        eta_comsol = params["eta"]
         grid_resolution = params.get("grid_resolution", 48)
 
         return cls(data_path=data_path, L_comsol=L_comsol, Fz_comsol=Fz_comsol,
-                   grid_resolution=grid_resolution)
+                   eta_comsol=eta_comsol, grid_resolution=grid_resolution)
 
     def __init__(self, data_path: str, L_comsol: float, Fz_comsol: float,
-                 grid_resolution: int = 48):
+                 eta_comsol: float = 0.065, grid_resolution: int = 48):
         """
         :param data_path: путь к U_lattice.txt
         :param L_comsol: размер периодической ячейки COMSOL (м)
         :param Fz_comsol: сила на каплю в расчёте COMSOL (Н)
+        :param eta_comsol: вязкость внешней жидкости в расчёте COMSOL (Па·с)
         :param grid_resolution: разрешение регулярной сетки (N³)
         """
         self.L_comsol = L_comsol
         self.Fz_comsol = Fz_comsol
+        self.eta_comsol = eta_comsol
         self.grid_resolution = grid_resolution
 
         # Загрузка и обработка
@@ -212,17 +215,56 @@ class COMSOLLatticeCorrection:
         )
         return interp_u, interp_v, interp_w
 
-    def evaluate(self, r_rel: np.ndarray) -> np.ndarray:
+    def evaluate(self, r_rel: np.ndarray, F_j: np.ndarray = None) -> np.ndarray:
         """
         Интерполяция поправочного поля в произвольных точках (в координатах COMSOL).
 
+        Если F_j задан, вычисляется полная тензорная свёртка для произвольного
+        направления силы с использованием кубической симметрии решётки.
+
         :param r_rel: массив (M, 3) относительных позиций в координатах COMSOL
+        :param F_j: массив (M, 3) сил на каплю (если None — возвращает сырой столбец β=z)
         :return: массив (M, 3) скоростей поправки
         """
-        u_vals = self._interp_u(r_rel)
-        v_vals = self._interp_v(r_rel)
-        w_vals = self._interp_w(r_rel)
-        return np.column_stack([u_vals, v_vals, w_vals])
+        if F_j is None:
+            u_vals = self._interp_u(r_rel)
+            v_vals = self._interp_v(r_rel)
+            w_vals = self._interp_w(r_rel)
+            return np.column_stack([u_vals, v_vals, w_vals])
+
+        Fz_inv = 1.0 / self.Fz_comsol
+
+        # Три набора переставленных координат
+        pts_z = r_rel                     # (x, y, z) — для G_z
+        pts_x = r_rel[:, [2, 1, 0]]      # (z, y, x) — для G_x
+        pts_y = r_rel[:, [0, 2, 1]]      # (x, z, y) — для G_y
+
+        # G_z(x,y,z) = (u2, v2, w2)
+        gz_x = self._interp_u(pts_z)
+        gz_y = self._interp_v(pts_z)
+        gz_z = self._interp_w(pts_z)
+
+        # G_x(x,y,z) = (w2(z,y,x), v2(z,y,x), u2(z,y,x))
+        gx_x = self._interp_w(pts_x)
+        gx_y = self._interp_v(pts_x)
+        gx_z = self._interp_u(pts_x)
+
+        # G_y(x,y,z) = (u2(x,z,y), w2(x,z,y), v2(x,z,y))
+        gy_x = self._interp_u(pts_y)
+        gy_y = self._interp_w(pts_y)
+        gy_z = self._interp_v(pts_y)
+
+        # Весовые коэффициенты: F_α / Fz_comsol
+        sx = F_j[:, 0] * Fz_inv
+        sy = F_j[:, 1] * Fz_inv
+        sz = F_j[:, 2] * Fz_inv
+
+        # Тензорная свёртка: U = sx*G_x + sy*G_y + sz*G_z
+        result_x = gx_x * sx + gy_x * sy + gz_x * sz
+        result_y = gx_y * sx + gy_y * sy + gz_y * sz
+        result_z = gx_z * sx + gy_z * sy + gz_z * sz
+
+        return np.column_stack([result_x, result_y, result_z])
 
     def get_grid_data(self) -> dict:
         """
@@ -236,6 +278,7 @@ class COMSOLLatticeCorrection:
             - grid_resolution: int
             - L_comsol: float
             - Fz_comsol: float
+            - eta_comsol: float
         """
         grid_min = self.grid_coords[0]
         grid_max = self.grid_coords[-1]
@@ -251,4 +294,5 @@ class COMSOLLatticeCorrection:
             'grid_resolution': self.grid_resolution,
             'L_comsol': self.L_comsol,
             'Fz_comsol': self.Fz_comsol,
+            'eta_comsol': self.eta_comsol,
         }

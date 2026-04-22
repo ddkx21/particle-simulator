@@ -51,6 +51,7 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.corr_grid_n = ti.field(dtype=ti.i32, shape=())
         self.corr_Fz_inv = ti.field(dtype=ti.f64, shape=())
         self.corr_L_ratio = ti.field(dtype=ti.f64, shape=())
+        self.corr_eta_ratio = ti.field(dtype=ti.f64, shape=())
         self.corr_enabled = ti.field(dtype=ti.i32, shape=())
         self.corr_enabled[None] = 0
 
@@ -81,14 +82,17 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.corr_grid_n[None] = grid_data['grid_resolution']
         self.corr_Fz_inv[None] = 1.0 / grid_data['Fz_comsol']
         self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
+        self.corr_eta_ratio[None] = grid_data['eta_comsol'] / self.eta_oil
 
         # Включить поправку
         self.corr_enabled[None] = 1
 
+        eta_ratio = grid_data['eta_comsol'] / self.eta_oil
         print(f"[DirectDropletForceCalculator] Периодическая поправка загружена: "
               f"сетка {grid_data['grid_resolution']}³, "
               f"L_ratio={grid_data['L_comsol']/L_sim:.6f}, "
-              f"Fz_comsol={grid_data['Fz_comsol']:.4e}")
+              f"Fz_comsol={grid_data['Fz_comsol']:.4e}, "
+              f"eta_ratio={eta_ratio:.6f}")
 
 
     @staticmethod
@@ -338,24 +342,43 @@ class DirectDropletForceCalculator(ForceCalculator):
 
                     convection_at_i += ti.Vector([V_x, V_y, V_z])
 
-                    # Поправка от периодических образов (COMSOL)
+                    # Поправка от периодических образов (COMSOL) — полный тензор
                     if self.corr_enabled[None] == 1:
-                        L_ratio = self.corr_L_ratio[None]
-                        xc = x * L_ratio
-                        yc = y * L_ratio
-                        zc = z * L_ratio
+                        cL = self.corr_L_ratio[None]
+                        xc = x * cL
+                        yc = y * cL
+                        zc = z * cL
 
                         gmin = self.corr_grid_min[None]
-                        inv_dx = self.corr_grid_inv_dx[None]
+                        ginv = self.corr_grid_inv_dx[None]
                         gn = self.corr_grid_n[None]
+                        Fz_inv = self.corr_Fz_inv[None]
+                        eta_r = self.corr_eta_ratio[None]
 
-                        cu = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, inv_dx, gn)
-                        cv = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, inv_dx, gn)
-                        cw = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, inv_dx, gn)
+                        # G_z: оригинальные координаты (xc, yc, zc)
+                        gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
+                        gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
+                        gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
 
-                        # Масштабирование: F_j_z / Fz_comsol * L_comsol/L_sim
-                        scale = ti_fz[j] * self.corr_Fz_inv[None] * L_ratio
-                        convection_at_i += ti.Vector([cu * scale, cv * scale, cw * scale])
+                        # G_x: перестановка x↔z → (zc, yc, xc)
+                        gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
+                        gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
+                        gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+
+                        # G_y: перестановка y↔z → (xc, zc, yc)
+                        gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
+                        gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
+                        gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+
+                        # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
+                        common = Fz_inv * eta_r * cL
+                        sx = fx * common
+                        sy = fy * common
+                        sz = fz * common
+
+                        convection_at_i[0] += gx_x * sx + gy_x * sy + gz_x * sz
+                        convection_at_i[1] += gx_y * sx + gy_y * sy + gz_y * sz
+                        convection_at_i[2] += gx_z * sx + gy_z * sy + gz_z * sz
 
             ti_vx[i] = convection_at_i[0]
             ti_vy[i] = convection_at_i[1]

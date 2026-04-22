@@ -128,10 +128,11 @@ class FlatOctree:
         self.corr_grid_n = ti.field(dtype=ti.i32, shape=())
         self.corr_Fz_inv = ti.field(dtype=ti.f64, shape=())
         self.corr_L_ratio = ti.field(dtype=ti.f64, shape=())
+        self.corr_eta_ratio = ti.field(dtype=ti.f64, shape=())
         self.corr_enabled = ti.field(dtype=ti.i32, shape=())
         self.corr_enabled[None] = 0
 
-    def load_periodic_correction(self, correction, L_sim: float):
+    def load_periodic_correction(self, correction, L_sim: float, eta_sim: float = None):
         """Загрузка данных периодической поправки COMSOL в Taichi-поля."""
         if self.correction_grid_resolution == 0:
             raise RuntimeError(
@@ -146,6 +147,8 @@ class FlatOctree:
         self.corr_grid_n[None] = grid_data['grid_resolution']
         self.corr_Fz_inv[None] = 1.0 / grid_data['Fz_comsol']
         self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
+        eta_comsol = grid_data['eta_comsol']
+        self.corr_eta_ratio[None] = eta_comsol / eta_sim if eta_sim is not None else 1.0
         self.corr_enabled[None] = 1
 
     def update_params(self, theta: float, mpl: int) -> None:
@@ -930,19 +933,42 @@ class FlatOctree:
                                 v_y += coeff * (Fy + dy * inv_r2 * dot)
                                 v_z += coeff * (Fz + dz * inv_r2 * dot)
 
-                                # Поправка от периодических образов (COMSOL)
+                                # Поправка от периодических образов (COMSOL) — полный тензор
                                 if self.corr_enabled[None] == 1:
                                     cL = self.corr_L_ratio[None]
+                                    xc = dx * cL
+                                    yc = dy * cL
+                                    zc = dz * cL
                                     gmin = self.corr_grid_min[None]
                                     ginv = self.corr_grid_inv_dx[None]
                                     gn = self.corr_grid_n[None]
-                                    cu = self._trilinear_interp(self.corr_grid_u, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                                    cv = self._trilinear_interp(self.corr_grid_v, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                                    cw = self._trilinear_interp(self.corr_grid_w, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                                    cscale = Fz * self.corr_Fz_inv[None] * cL
-                                    v_x += cu * cscale
-                                    v_y += cv * cscale
-                                    v_z += cw * cscale
+                                    Fz_inv = self.corr_Fz_inv[None]
+                                    eta_r = self.corr_eta_ratio[None]
+
+                                    # G_z: (xc, yc, zc)
+                                    gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
+                                    gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
+                                    gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
+
+                                    # G_x: перестановка x↔z → (zc, yc, xc)
+                                    gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
+                                    gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
+                                    gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+
+                                    # G_y: перестановка y↔z → (xc, zc, yc)
+                                    gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
+                                    gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
+                                    gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+
+                                    # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
+                                    common = Fz_inv * eta_r * cL
+                                    sx = Fx * common
+                                    sy = Fy * common
+                                    sz = Fz * common
+
+                                    v_x += gx_x * sx + gy_x * sy + gz_x * sz
+                                    v_y += gx_y * sx + gy_y * sy + gz_y * sz
+                                    v_z += gx_z * sx + gy_z * sy + gz_z * sz
 
                     node_idx = self.nodes.next[node_idx]
                     continue
@@ -981,19 +1007,42 @@ class FlatOctree:
                     v_y += coeff * (Fy + dy * inv_r2 * dot)
                     v_z += coeff * (Fz + dz * inv_r2 * dot)
 
-                    # Поправка от периодических образов (COMSOL) — монопольное приближение
+                    # Поправка от периодических образов (COMSOL) — полный тензор, монопольное приближение
                     if self.corr_enabled[None] == 1:
                         cL = self.corr_L_ratio[None]
+                        xc = dx * cL
+                        yc = dy * cL
+                        zc = dz * cL
                         gmin = self.corr_grid_min[None]
                         ginv = self.corr_grid_inv_dx[None]
                         gn = self.corr_grid_n[None]
-                        cu = self._trilinear_interp(self.corr_grid_u, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                        cv = self._trilinear_interp(self.corr_grid_v, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                        cw = self._trilinear_interp(self.corr_grid_w, dx*cL, dy*cL, dz*cL, gmin, ginv, gn)
-                        cscale = Fz * self.corr_Fz_inv[None] * cL
-                        v_x += cu * cscale
-                        v_y += cv * cscale
-                        v_z += cw * cscale
+                        Fz_inv = self.corr_Fz_inv[None]
+                        eta_r = self.corr_eta_ratio[None]
+
+                        # G_z: (xc, yc, zc)
+                        gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
+                        gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
+                        gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
+
+                        # G_x: перестановка x↔z → (zc, yc, xc)
+                        gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
+                        gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
+                        gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+
+                        # G_y: перестановка y↔z → (xc, zc, yc)
+                        gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
+                        gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
+                        gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+
+                        # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
+                        common = Fz_inv * eta_r * cL
+                        sx = Fx * common
+                        sy = Fy * common
+                        sz = Fz * common
+
+                        v_x += gx_x * sx + gy_x * sy + gz_x * sz
+                        v_y += gx_y * sx + gy_y * sy + gz_y * sz
+                        v_z += gx_z * sx + gy_z * sy + gz_z * sz
 
                     # --- Дипольная коррекция: δv = ∇T : D ---
                     # R³-взвешенный центр масс
