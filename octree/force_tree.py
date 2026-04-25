@@ -199,3 +199,33 @@ class TreeDropletForceCalculator(ForceCalculator):
         )
 
         return forces, velocities
+
+    def calculate_forces_and_total_velocity(self,
+                                            positions: np.ndarray,
+                                            radii: np.ndarray,
+                                            stokes_factor: float,
+                                            *,
+                                            L: float | None = None,
+                                            periodic: bool | None = None,
+                                            ) -> tuple:
+        """
+        Вычислить силы и полную скорость (миграция + конвекция) за один проход.
+
+        Возвращает: (forces (N,3), total_velocities (N,3))
+        """
+        positions = self._to_contiguous(positions)
+        radii = self._to_contiguous(radii)
+        n = positions.shape[0]
+
+        use_L = L if L is not None else self.L
+        use_periodic = periodic if periodic is not None else self.periodic
+
+        self._ensure_octree_capacity(n)
+        self.octree.build(positions, radii, use_L, use_periodic)
+        self._tree_is_stale = True
+
+        forces, total_velocity = self.octree.compute_forces_and_total_velocity(
+            self.m_const, self.eta_const, stokes_factor
+        )
+
+        return forces, total_velocity

@@ -100,27 +100,33 @@ class DirectDropletForceCalculator(ForceCalculator):
     def _trilinear_interp(grid: ti.template(), x: ti.f64, y: ti.f64, z: ti.f64,
                           grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32) -> ti.f64:
         """Трилинейная интерполяция на регулярной 3D сетке с clamping."""
-        # Преобразование в индексное пространство
+        ix, iy, iz, tx, ty, tz = DirectDropletForceCalculator._precompute_grid_idx(x, y, z, grid_min, inv_dx, n)
+        return DirectDropletForceCalculator._interp_precomp(grid, ix, iy, iz, tx, ty, tz)
+
+    @staticmethod
+    @ti.func
+    def _precompute_grid_idx(x: ti.f64, y: ti.f64, z: ti.f64,
+                             grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32):
         fx = (x - grid_min) * inv_dx
         fy = (y - grid_min) * inv_dx
         fz = (z - grid_min) * inv_dx
-
-        # Clamping к границам
         n_max = ti.cast(n - 1, ti.f64)
         fx = ti.max(0.0, ti.min(fx, n_max))
         fy = ti.max(0.0, ti.min(fy, n_max))
         fz = ti.max(0.0, ti.min(fz, n_max))
-
-        # Целочисленные индексы и дробные части
         ix = ti.min(ti.cast(ti.floor(fx), ti.i32), n - 2)
         iy = ti.min(ti.cast(ti.floor(fy), ti.i32), n - 2)
         iz = ti.min(ti.cast(ti.floor(fz), ti.i32), n - 2)
-
         tx = fx - ti.cast(ix, ti.f64)
         ty = fy - ti.cast(iy, ti.f64)
         tz = fz - ti.cast(iz, ti.f64)
+        return ix, iy, iz, tx, ty, tz
 
-        # 8 вершин куба
+    @staticmethod
+    @ti.func
+    def _interp_precomp(grid: ti.template(),
+                        ix: ti.i32, iy: ti.i32, iz: ti.i32,
+                        tx: ti.f64, ty: ti.f64, tz: ti.f64) -> ti.f64:
         c000 = grid[ix, iy, iz]
         c001 = grid[ix, iy, iz + 1]
         c010 = grid[ix, iy + 1, iz]
@@ -129,18 +135,14 @@ class DirectDropletForceCalculator(ForceCalculator):
         c101 = grid[ix + 1, iy, iz + 1]
         c110 = grid[ix + 1, iy + 1, iz]
         c111 = grid[ix + 1, iy + 1, iz + 1]
-
-        # Трилинейная формула
-        result = (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
-                  c001 * (1 - tx) * (1 - ty) * tz +
-                  c010 * (1 - tx) * ty * (1 - tz) +
-                  c011 * (1 - tx) * ty * tz +
-                  c100 * tx * (1 - ty) * (1 - tz) +
-                  c101 * tx * (1 - ty) * tz +
-                  c110 * tx * ty * (1 - tz) +
-                  c111 * tx * ty * tz)
-
-        return result
+        return (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
+                c001 * (1 - tx) * (1 - ty) * tz +
+                c010 * (1 - tx) * ty * (1 - tz) +
+                c011 * (1 - tx) * ty * tz +
+                c100 * tx * (1 - ty) * (1 - tz) +
+                c101 * tx * (1 - ty) * tz +
+                c110 * tx * ty * (1 - tz) +
+                c111 * tx * ty * tz)
 
 
     @staticmethod
@@ -355,22 +357,24 @@ class DirectDropletForceCalculator(ForceCalculator):
                         Fz_inv = self.corr_Fz_inv[None]
                         eta_r = self.corr_eta_ratio[None]
 
-                        # G_z: оригинальные координаты (xc, yc, zc)
-                        gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
-                        gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
-                        gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
+                        # G_z: (xc, yc, zc) — предвычисление индексов один раз
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
                         # G_x: перестановка x↔z → (zc, yc, xc)
-                        gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
-                        gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
-                        gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
                         # G_y: перестановка y↔z → (xc, zc, yc)
-                        gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
-                        gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
-                        gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
 
-                        # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
                         common = Fz_inv * eta_r * cL
                         sx = fx * common
                         sy = fy * common
@@ -383,3 +387,46 @@ class DirectDropletForceCalculator(ForceCalculator):
             ti_vx[i] = convection_at_i[0]
             ti_vy[i] = convection_at_i[1]
             ti_vz[i] = convection_at_i[2]
+
+
+    def calculate_forces_and_convection(self, positions: np.ndarray, radii: np.ndarray) -> tuple:
+        self.num_particles = positions.shape[0]
+        self.ti_num_particles[None] = self.num_particles
+
+        positions = positions.astype(np.float64)
+        radii = radii.astype(np.float64)
+
+        self.update_values(self.ti_radii, np.ascontiguousarray(radii), self.num_particles)
+        self.update_values(self.ti_x, np.ascontiguousarray(positions[:, 0]), self.num_particles)
+        self.update_values(self.ti_y, np.ascontiguousarray(positions[:, 1]), self.num_particles)
+        self.update_values(self.ti_z, np.ascontiguousarray(positions[:, 2]), self.num_particles)
+
+        self._calculate_forces(
+            self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z,
+            self.ti_radii, self.ti_fx, self.ti_fy, self.ti_fz)
+
+        self._calculate_convection_velocities(
+            self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z,
+            self.ti_fx, self.ti_fy, self.ti_fz,
+            self.ti_vx, self.ti_vy, self.ti_vz)
+
+        n = self.num_particles
+        forces = np.stack((self.ti_fx.to_numpy()[:n],
+                           self.ti_fy.to_numpy()[:n],
+                           self.ti_fz.to_numpy()[:n]), axis=1)
+        velocities = np.stack((self.ti_vx.to_numpy()[:n],
+                               self.ti_vy.to_numpy()[:n],
+                               self.ti_vz.to_numpy()[:n]), axis=1)
+
+        self.ti_x.fill(0)
+        self.ti_y.fill(0)
+        self.ti_z.fill(0)
+        self.ti_fx.fill(0)
+        self.ti_fy.fill(0)
+        self.ti_fz.fill(0)
+        self.ti_vx.fill(0)
+        self.ti_vy.fill(0)
+        self.ti_vz.fill(0)
+        self.ti_radii.fill(0)
+
+        return forces, velocities

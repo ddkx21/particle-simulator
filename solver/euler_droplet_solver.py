@@ -84,15 +84,15 @@ class EulerDropletSolver(Solver):
                             self.post_processor.update_live_plot()
                         break
 
-                # Вычисляем силы для каждой частицы
-                forces = self.force_calculator.calculate(positions, radii)
-
-                # Вычисляем скорости
-                migration_velocities = forces / (self.stokes_factor * radii[:, np.newaxis])
-                convection_velocities = self.force_calculator.calculate_convection(positions, radii, forces)
-
-                # Обновляем позиции методом Эйлера
-                positions += (migration_velocities + convection_velocities) * dt
+                # Вычисляем силы и скорости
+                if hasattr(self.force_calculator, 'calculate_forces_and_total_velocity'):
+                    forces, total_velocities = self.force_calculator.calculate_forces_and_total_velocity(
+                        positions, radii, stokes_factor=self.stokes_factor)
+                    positions += total_velocities * dt
+                else:
+                    forces, convection_velocities = self.force_calculator.calculate_forces_and_convection(positions, radii)
+                    migration_velocities = forces / (self.stokes_factor * radii[:, np.newaxis])
+                    positions += (migration_velocities + convection_velocities) * dt
 
                 # Граничные условия
                 L = self.force_calculator.L

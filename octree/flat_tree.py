@@ -867,6 +867,47 @@ class FlatOctree:
                 c110 * tx * ty * (1 - tz) +
                 c111 * tx * ty * tz)
 
+    @staticmethod
+    @ti.func
+    def _precompute_grid_idx(x: ti.f64, y: ti.f64, z: ti.f64,
+                             grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32):
+        fx = (x - grid_min) * inv_dx
+        fy = (y - grid_min) * inv_dx
+        fz = (z - grid_min) * inv_dx
+        n_max = ti.cast(n - 1, ti.f64)
+        fx = ti.max(0.0, ti.min(fx, n_max))
+        fy = ti.max(0.0, ti.min(fy, n_max))
+        fz = ti.max(0.0, ti.min(fz, n_max))
+        ix = ti.min(ti.cast(ti.floor(fx), ti.i32), n - 2)
+        iy = ti.min(ti.cast(ti.floor(fy), ti.i32), n - 2)
+        iz = ti.min(ti.cast(ti.floor(fz), ti.i32), n - 2)
+        tx = fx - ti.cast(ix, ti.f64)
+        ty = fy - ti.cast(iy, ti.f64)
+        tz = fz - ti.cast(iz, ti.f64)
+        return ix, iy, iz, tx, ty, tz
+
+    @staticmethod
+    @ti.func
+    def _interp_precomp(grid: ti.template(),
+                        ix: ti.i32, iy: ti.i32, iz: ti.i32,
+                        tx: ti.f64, ty: ti.f64, tz: ti.f64) -> ti.f64:
+        c000 = grid[ix, iy, iz]
+        c001 = grid[ix, iy, iz + 1]
+        c010 = grid[ix, iy + 1, iz]
+        c011 = grid[ix, iy + 1, iz + 1]
+        c100 = grid[ix + 1, iy, iz]
+        c101 = grid[ix + 1, iy, iz + 1]
+        c110 = grid[ix + 1, iy + 1, iz]
+        c111 = grid[ix + 1, iy + 1, iz + 1]
+        return (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
+                c001 * (1 - tx) * (1 - ty) * tz +
+                c010 * (1 - tx) * ty * (1 - tz) +
+                c011 * (1 - tx) * ty * tz +
+                c100 * tx * (1 - ty) * (1 - tz) +
+                c101 * tx * (1 - ty) * tz +
+                c110 * tx * ty * (1 - tz) +
+                c111 * tx * ty * tz)
+
     @ti.kernel
     def _compute_stokeslet_kernel(self,
                                   forces_np: ti.types.ndarray(),
@@ -945,22 +986,24 @@ class FlatOctree:
                                     Fz_inv = self.corr_Fz_inv[None]
                                     eta_r = self.corr_eta_ratio[None]
 
-                                    # G_z: (xc, yc, zc)
-                                    gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
-                                    gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
-                                    gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
+                                    # G_z: (xc, yc, zc) — предвычисление индексов один раз
+                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                                    gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
                                     # G_x: перестановка x↔z → (zc, yc, xc)
-                                    gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
-                                    gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
-                                    gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                                    gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
                                     # G_y: перестановка y↔z → (xc, zc, yc)
-                                    gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
-                                    gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
-                                    gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                                    gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
 
-                                    # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
                                     common = Fz_inv * eta_r * cL
                                     sx = Fx * common
                                     sy = Fy * common
@@ -1019,22 +1062,24 @@ class FlatOctree:
                         Fz_inv = self.corr_Fz_inv[None]
                         eta_r = self.corr_eta_ratio[None]
 
-                        # G_z: (xc, yc, zc)
-                        gz_x = self._trilinear_interp(self.corr_grid_u, xc, yc, zc, gmin, ginv, gn)
-                        gz_y = self._trilinear_interp(self.corr_grid_v, xc, yc, zc, gmin, ginv, gn)
-                        gz_z = self._trilinear_interp(self.corr_grid_w, xc, yc, zc, gmin, ginv, gn)
+                        # G_z: (xc, yc, zc) — предвычисление индексов один раз
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
                         # G_x: перестановка x↔z → (zc, yc, xc)
-                        gx_x = self._trilinear_interp(self.corr_grid_w, zc, yc, xc, gmin, ginv, gn)
-                        gx_y = self._trilinear_interp(self.corr_grid_v, zc, yc, xc, gmin, ginv, gn)
-                        gx_z = self._trilinear_interp(self.corr_grid_u, zc, yc, xc, gmin, ginv, gn)
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
                         # G_y: перестановка y↔z → (xc, zc, yc)
-                        gy_x = self._trilinear_interp(self.corr_grid_u, xc, zc, yc, gmin, ginv, gn)
-                        gy_y = self._trilinear_interp(self.corr_grid_w, xc, zc, yc, gmin, ginv, gn)
-                        gy_z = self._trilinear_interp(self.corr_grid_v, xc, zc, yc, gmin, ginv, gn)
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
 
-                        # scale = F_α / Fz_comsol * (η_comsol / η_sim) * L_ratio
                         common = Fz_inv * eta_r * cL
                         sx = Fx * common
                         sy = Fy * common
@@ -1145,6 +1190,256 @@ class FlatOctree:
         forces = self.compute_forces(m_const)
         velocities = self.compute_stokeslet_from_fields(forces, eta_const)
         return forces, velocities
+
+    @ti.kernel
+    def _compute_total_velocity_kernel(self,
+                                       forces_np: ti.types.ndarray(),
+                                       vx: ti.types.ndarray(),
+                                       vy: ti.types.ndarray(),
+                                       vz: ti.types.ndarray(),
+                                       eta_const: ti.f64,
+                                       stokes_factor: ti.f64):
+        """Объединённое ядро: v_total = v_migration + v_convection за один обход."""
+        n = self.num_particles[None]
+        theta_sq = self.theta_sq[None]
+        fsq_threshold = _FORCE_SQ_SKIP_THRESHOLD
+
+        for i in range(n):
+            pos_i = self.particle_positions[i]
+            fi = self.particle_forces[i]
+            inv_stokes_r = 1.0 / (stokes_factor * self.particle_radii[i])
+            v_x = fi[0] * inv_stokes_r
+            v_y = fi[1] * inv_stokes_r
+            v_z = fi[2] * inv_stokes_r
+
+            node_idx = 0
+            while node_idx >= 0:
+                cnt = self.nodes.count[node_idx]
+                fs2 = (self.nodes.force_sum_x[node_idx] ** 2 +
+                       self.nodes.force_sum_y[node_idx] ** 2 +
+                       self.nodes.force_sum_z[node_idx] ** 2)
+                if cnt == 0 or fs2 < fsq_threshold:
+                    node_idx = self.nodes.next[node_idx]
+                    continue
+
+                is_leaf = self.nodes.first_child[node_idx] < 0
+
+                if is_leaf:
+                    ls = self.nodes.leaf_start[node_idx]
+                    for k in range(cnt):
+                        j = self.leaf_indices[ls + k]
+                        if j >= 0 and j != i:
+                            pos_j = self.particle_positions[j]
+                            dx = pos_i[0] - pos_j[0]
+                            dy = pos_i[1] - pos_j[1]
+                            dz = pos_i[2] - pos_j[2]
+
+                            if self.periodic[None] == 1:
+                                L_val = self.L[None]
+                                if ti.abs(dx) > L_val * 0.5:
+                                    dx -= ti.math.sign(dx) * L_val
+                                if ti.abs(dy) > L_val * 0.5:
+                                    dy -= ti.math.sign(dy) * L_val
+                                if ti.abs(dz) > L_val * 0.5:
+                                    dz -= ti.math.sign(dz) * L_val
+
+                            r_sq = dx * dx + dy * dy + dz * dz
+                            r_sum = self.particle_radii[i] + self.particle_radii[j]
+
+                            if r_sq >= r_sum * r_sum:
+                                r = ti.sqrt(r_sq)
+                                inv_r = 1.0 / r
+                                inv_r2 = inv_r * inv_r
+
+                                Fx = forces_np[j, 0]
+                                Fy = forces_np[j, 1]
+                                Fz = forces_np[j, 2]
+                                dot = dx * Fx + dy * Fy + dz * Fz
+
+                                coeff = eta_const * inv_r
+                                v_x += coeff * (Fx + dx * inv_r2 * dot)
+                                v_y += coeff * (Fy + dy * inv_r2 * dot)
+                                v_z += coeff * (Fz + dz * inv_r2 * dot)
+
+                                if self.corr_enabled[None] == 1:
+                                    cL = self.corr_L_ratio[None]
+                                    xc = dx * cL
+                                    yc = dy * cL
+                                    zc = dz * cL
+                                    gmin = self.corr_grid_min[None]
+                                    ginv = self.corr_grid_inv_dx[None]
+                                    gn = self.corr_grid_n[None]
+                                    Fz_inv = self.corr_Fz_inv[None]
+                                    eta_r = self.corr_eta_ratio[None]
+
+                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                                    gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
+
+                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                                    gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
+
+                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                                    gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
+
+                                    common = Fz_inv * eta_r * cL
+                                    sx = Fx * common
+                                    sy = Fy * common
+                                    sz = Fz * common
+
+                                    v_x += gx_x * sx + gy_x * sy + gz_x * sz
+                                    v_y += gx_y * sx + gy_y * sy + gz_y * sz
+                                    v_z += gx_z * sx + gy_z * sy + gz_z * sz
+
+                    node_idx = self.nodes.next[node_idx]
+                    continue
+
+                s = self.nodes.size(node_idx)
+                center = self.nodes.get_center(node_idx)
+                dx = pos_i[0] - center[0]
+                dy = pos_i[1] - center[1]
+                dz = pos_i[2] - center[2]
+
+                if self.periodic[None] == 1:
+                    L_val = self.L[None]
+                    if ti.abs(dx) > L_val * 0.5:
+                        dx -= ti.math.sign(dx) * L_val
+                    if ti.abs(dy) > L_val * 0.5:
+                        dy -= ti.math.sign(dy) * L_val
+                    if ti.abs(dz) > L_val * 0.5:
+                        dz -= ti.math.sign(dz) * L_val
+
+                D_sq = dx * dx + dy * dy + dz * dz
+
+                if s * s < theta_sq * D_sq and D_sq > 0.0:
+                    r = ti.sqrt(D_sq)
+                    inv_r = 1.0 / r
+                    inv_r2 = inv_r * inv_r
+
+                    Fx = self.nodes.force_sum_x[node_idx]
+                    Fy = self.nodes.force_sum_y[node_idx]
+                    Fz = self.nodes.force_sum_z[node_idx]
+                    dot = dx * Fx + dy * Fy + dz * Fz
+
+                    coeff = eta_const * inv_r
+                    v_x += coeff * (Fx + dx * inv_r2 * dot)
+                    v_y += coeff * (Fy + dy * inv_r2 * dot)
+                    v_z += coeff * (Fz + dz * inv_r2 * dot)
+
+                    if self.corr_enabled[None] == 1:
+                        cL = self.corr_L_ratio[None]
+                        xc = dx * cL
+                        yc = dy * cL
+                        zc = dz * cL
+                        gmin = self.corr_grid_min[None]
+                        ginv = self.corr_grid_inv_dx[None]
+                        gn = self.corr_grid_n[None]
+                        Fz_inv = self.corr_Fz_inv[None]
+                        eta_r = self.corr_eta_ratio[None]
+
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
+                        gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
+
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
+                        gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
+
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
+                        gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
+
+                        common = Fz_inv * eta_r * cL
+                        sx = Fx * common
+                        sy = Fy * common
+                        sz = Fz * common
+
+                        v_x += gx_x * sx + gy_x * sy + gz_x * sz
+                        v_y += gx_y * sx + gy_y * sy + gz_y * sz
+                        v_z += gx_z * sx + gy_z * sy + gz_z * sz
+
+                    # --- Дипольная коррекция: δv = ∇T : D ---
+                    r3s = self.nodes.R3_sum[node_idx]
+                    cmx = ti.f64(0.0)
+                    cmy = ti.f64(0.0)
+                    cmz = ti.f64(0.0)
+                    if r3s > 0.0:
+                        inv_r3s = 1.0 / r3s
+                        cmx = self.nodes.R3_cx[node_idx] * inv_r3s
+                        cmy = self.nodes.R3_cy[node_idx] * inv_r3s
+                        cmz = self.nodes.R3_cz[node_idx] * inv_r3s
+                    else:
+                        cmx = (self.nodes.min_x[node_idx] + self.nodes.max_x[node_idx]) * 0.5
+                        cmy = (self.nodes.min_y[node_idx] + self.nodes.max_y[node_idx]) * 0.5
+                        cmz = (self.nodes.min_z[node_idx] + self.nodes.max_z[node_idx]) * 0.5
+
+                    Dxx = self.nodes.fmom_xx[node_idx] - cmx * Fx
+                    Dxy = self.nodes.fmom_xy[node_idx] - cmx * Fy
+                    Dxz = self.nodes.fmom_xz[node_idx] - cmx * Fz
+                    Dyx = self.nodes.fmom_yx[node_idx] - cmy * Fx
+                    Dyy = self.nodes.fmom_yy[node_idx] - cmy * Fy
+                    Dyz = self.nodes.fmom_yz[node_idx] - cmy * Fz
+                    Dzx = self.nodes.fmom_zx[node_idx] - cmz * Fx
+                    Dzy = self.nodes.fmom_zy[node_idx] - cmz * Fy
+                    Dzz = self.nodes.fmom_zz[node_idx] - cmz * Fz
+
+                    rx = dx; ry = dy; rz = dz
+
+                    ux = Dxx * rx + Dyx * ry + Dzx * rz
+                    uy = Dxy * rx + Dyy * ry + Dzy * rz
+                    uz = Dxz * rx + Dyz * ry + Dzz * rz
+
+                    wx = Dxx * rx + Dxy * ry + Dxz * rz
+                    wy = Dyx * rx + Dyy * ry + Dyz * rz
+                    wz = Dzx * rx + Dzy * ry + Dzz * rz
+
+                    s_tr = Dxx + Dyy + Dzz
+                    q = rx * wx + ry * wy + rz * wz
+
+                    inv_r3 = inv_r * inv_r2
+                    inv_r5 = inv_r3 * inv_r2
+
+                    v_x += eta_const * (inv_r3 * (ux - wx - s_tr * rx) + 3.0 * rx * q * inv_r5)
+                    v_y += eta_const * (inv_r3 * (uy - wy - s_tr * ry) + 3.0 * ry * q * inv_r5)
+                    v_z += eta_const * (inv_r3 * (uz - wz - s_tr * rz) + 3.0 * rz * q * inv_r5)
+
+                    node_idx = self.nodes.next[node_idx]
+                else:
+                    node_idx = self.nodes.first_child[node_idx]
+
+            vx[i] = v_x
+            vy[i] = v_y
+            vz[i] = v_z
+
+    def compute_total_velocity(self, forces: np.ndarray, eta_const: float,
+                               stokes_factor: float) -> np.ndarray:
+        """Вычисление полной скорости (миграция + конвекция) за один обход дерева."""
+        n = self.num_particles[None]
+        forces_c = np.ascontiguousarray(forces[:n], dtype=np.float64)
+        vx = self._out_vx[:n]
+        vy = self._out_vy[:n]
+        vz = self._out_vz[:n]
+        vx[:] = 0.0
+        vy[:] = 0.0
+        vz[:] = 0.0
+        self._propagate_forces_from_fields()
+        self._compute_total_velocity_kernel(forces_c, vx, vy, vz, eta_const, stokes_factor)
+        return np.stack([vx, vy, vz], axis=1)
+
+    def compute_forces_and_total_velocity(self, m_const: float, eta_const: float,
+                                          stokes_factor: float) -> tuple:
+        """Расчёт сил + полной скорости за минимальное число обходов."""
+        forces = self.compute_forces(m_const)
+        total_velocity = self.compute_total_velocity(forces, eta_const, stokes_factor)
+        return forces, total_velocity
 
     # =================================================================
     # Диагностика
