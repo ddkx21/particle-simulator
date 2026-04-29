@@ -131,6 +131,8 @@ class FlatOctree:
         self.corr_eta_ratio = ti.field(dtype=ti.f64, shape=())
         self.corr_enabled = ti.field(dtype=ti.i32, shape=())
         self.corr_enabled[None] = 0
+        self.corr_self_coeff = ti.field(dtype=ti.f64, shape=())
+        self.corr_self_coeff[None] = 0.0
 
     def load_periodic_correction(self, correction, L_sim: float, eta_sim: float = None):
         """Загрузка данных периодической поправки COMSOL в Taichi-поля."""
@@ -148,7 +150,16 @@ class FlatOctree:
         self.corr_Fz_inv[None] = 1.0 / grid_data['Fz_comsol']
         self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
         eta_comsol = grid_data['eta_comsol']
-        self.corr_eta_ratio[None] = eta_comsol / eta_sim if eta_sim is not None else 1.0
+        eta_ratio = eta_comsol / eta_sim if eta_sim is not None else 1.0
+        self.corr_eta_ratio[None] = eta_ratio
+
+        # Self-interaction: G_self = w2(0,0,0) * Fz_inv * eta_ratio * L_ratio
+        r0 = np.array([[0.0, 0.0, 0.0]])
+        G_z_at_origin = correction.evaluate(r0)
+        w_self = float(G_z_at_origin[0, 2])
+        L_ratio = grid_data['L_comsol'] / L_sim
+        self.corr_self_coeff[None] = w_self / grid_data['Fz_comsol'] * eta_ratio * L_ratio
+
         self.corr_enabled[None] = 1
 
     def update_params(self, theta: float, mpl: int) -> None:
@@ -462,6 +473,7 @@ class FlatOctree:
             self.nodes.R3_cx[idx] = 0.0
             self.nodes.R3_cy[idx] = 0.0
             self.nodes.R3_cz[idx] = 0.0
+            self.nodes.max_radius[idx] = 0.0
             self.nodes.force_sum_x[idx] = 0.0
             self.nodes.force_sum_y[idx] = 0.0
             self.nodes.force_sum_z[idx] = 0.0
@@ -474,19 +486,24 @@ class FlatOctree:
                 wcx = ti.f64(0.0)
                 wcy = ti.f64(0.0)
                 wcz = ti.f64(0.0)
+                max_r = ti.f64(0.0)
                 for k in range(cnt):
                     pi = self.leaf_indices[ls + k]
                     if pi >= 0:
-                        r3 = self.particle_radii[pi] ** 3
+                        r_i = self.particle_radii[pi]
+                        r3 = r_i ** 3
                         pos = self.particle_positions[pi]
                         r3_sum += r3
                         wcx += pos[0] * r3
                         wcy += pos[1] * r3
                         wcz += pos[2] * r3
+                        if r_i > max_r:
+                            max_r = r_i
                 self.nodes.R3_sum[idx] = r3_sum
                 self.nodes.R3_cx[idx] = wcx
                 self.nodes.R3_cy[idx] = wcy
                 self.nodes.R3_cz[idx] = wcz
+                self.nodes.max_radius[idx] = max_r
 
     @ti.kernel
     def _sweep_r3_level(self, level_start: ti.i32, level_end: ti.i32):
@@ -502,6 +519,7 @@ class FlatOctree:
             wcx = ti.f64(0.0)
             wcy = ti.f64(0.0)
             wcz = ti.f64(0.0)
+            max_r = ti.f64(0.0)
             for j in range(8):
                 child_idx = base + j
                 if self.nodes.count[child_idx] > 0:
@@ -509,10 +527,14 @@ class FlatOctree:
                     wcx += self.nodes.R3_cx[child_idx]
                     wcy += self.nodes.R3_cy[child_idx]
                     wcz += self.nodes.R3_cz[child_idx]
+                    child_mr = self.nodes.max_radius[child_idx]
+                    if child_mr > max_r:
+                        max_r = child_mr
             self.nodes.R3_sum[parent_idx] = r3s
             self.nodes.R3_cx[parent_idx] = wcx
             self.nodes.R3_cy[parent_idx] = wcy
             self.nodes.R3_cz[parent_idx] = wcz
+            self.nodes.max_radius[parent_idx] = max_r
 
     def _propagate_r3(self):
         """Распространение R³-агрегатов снизу вверх (двухпроходное, параллельно по уровням)."""
@@ -1142,6 +1164,13 @@ class FlatOctree:
                     node_idx = self.nodes.next[node_idx]
                 else:
                     node_idx = self.nodes.first_child[node_idx]
+
+            # Self-interaction: вклад периодических образов капли на себя
+            if self.corr_enabled[None] == 1:
+                g_self = self.corr_self_coeff[None]
+                v_x += g_self * forces_np[i, 0]
+                v_y += g_self * forces_np[i, 1]
+                v_z += g_self * forces_np[i, 2]
 
             vx[i] = v_x
             vy[i] = v_y

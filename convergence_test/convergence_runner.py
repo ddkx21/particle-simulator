@@ -122,6 +122,7 @@ class ConvergenceTest:
                     positions, radii, self.L, K,
                     self.m_const, self.eta_const,
                     self.eps_oil, self.eta_oil, self.E,
+                    correction,
                 )
                 t_ref = time.perf_counter() - t0
 
@@ -167,7 +168,7 @@ if __name__ == "__main__":
 
     # Полный тест
     N_list = [1000, 5000, 10000, 20000, 50000]
-    K_list = [1, 3, 5, 7, 9]
+    K_list = [1, 3, 5]
 
     df = test.run(N_list, K_list)
     print("\n" + df.to_string(index=False))

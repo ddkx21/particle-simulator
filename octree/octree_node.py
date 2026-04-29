@@ -60,6 +60,9 @@ class OctreeNode:
         self.fmom_zy = ti.field(dtype=ti.f64, shape=max_nodes)
         self.fmom_zz = ti.field(dtype=ti.f64, shape=max_nodes)
 
+        # Максимальный радиус частицы в поддереве (для отсечения в collision frequency)
+        self.max_radius = ti.field(dtype=ti.f64, shape=max_nodes)
+
         # Структура дерева
         self.first_child = ti.field(dtype=ti.i32, shape=max_nodes)
         self.next = ti.field(dtype=ti.i32, shape=max_nodes)
@@ -126,6 +129,7 @@ class OctreeNode:
         self.R3_cx[idx] = 0.0
         self.R3_cy[idx] = 0.0
         self.R3_cz[idx] = 0.0
+        self.max_radius[idx] = 0.0
         self.force_sum_x[idx] = 0.0
         self.force_sum_y[idx] = 0.0
         self.force_sum_z[idx] = 0.0

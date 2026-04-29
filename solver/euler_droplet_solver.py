@@ -5,7 +5,8 @@ from .solver_base import Solver
 class EulerDropletSolver(Solver):
 
     def __init__(self, force_calculator, solution, post_processor,
-                 collision_detector=None, save_interval: int = 1):
+                 collision_detector=None, save_interval: int = 1,
+                 pbm_coupling=None):
         """
         Инициализация класса Solver.
 
@@ -14,11 +15,13 @@ class EulerDropletSolver(Solver):
         :param post_processor: Объект класса PostProcessor для визуализации.
         :param collision_detector: Объект CollisionDetector для обнаружения столкновений (опционально).
         :param save_interval: Сохранять каждый K-й шаг (1 = каждый шаг, 10 = каждый 10-й).
+        :param pbm_coupling: Объект DEMPBMCoupling для связки с PBM (опционально).
         """
         self.force_calculator = force_calculator
         self.solution = solution
         self.post_processor = post_processor
         self.collision_detector = collision_detector
+        self.pbm_coupling = pbm_coupling
         self.simulation_time = 0  # Время моделирования, реальное
         self.save_interval = max(save_interval, 1)
 
@@ -74,6 +77,8 @@ class EulerDropletSolver(Solver):
                 if self.collision_detector is not None:
                     is_collision, collided_pairs = self.collision_detector.detect(positions, radii)
                     if is_collision:
+                        if self.pbm_coupling is not None:
+                            self.pbm_coupling.on_collision(collided_pairs, radii)
                         self.solution.is_collision = True
                         self.solution.collided_droplets = collided_pairs
                         self.solution.compact()
@@ -100,6 +105,10 @@ class EulerDropletSolver(Solver):
                 if boundary_mode == "periodic":
                     positions %= L
                 # "open" — без ограничений, капли могут покидать коробку
+
+                # PBM синхронизация
+                if self.pbm_coupling is not None:
+                    self.pbm_coupling.step(t + dt, radii, dt)
 
                 # Сохраняем текущее положение частиц
                 t += dt

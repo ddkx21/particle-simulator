@@ -54,6 +54,8 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.corr_eta_ratio = ti.field(dtype=ti.f64, shape=())
         self.corr_enabled = ti.field(dtype=ti.i32, shape=())
         self.corr_enabled[None] = 0
+        self.corr_self_coeff = ti.field(dtype=ti.f64, shape=())
+        self.corr_self_coeff[None] = 0.0
 
 
     def load_periodic_correction(self, correction, L_sim: float):
@@ -84,15 +86,23 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
         self.corr_eta_ratio[None] = grid_data['eta_comsol'] / self.eta_oil
 
+        # Self-interaction: G_self = w2(0,0,0) * Fz_inv * eta_ratio * L_ratio (изотропный тензор)
+        r0 = np.array([[0.0, 0.0, 0.0]])
+        G_z_at_origin = correction.evaluate(r0)
+        w_self = float(G_z_at_origin[0, 2])
+        L_ratio = grid_data['L_comsol'] / L_sim
+        eta_ratio = grid_data['eta_comsol'] / self.eta_oil
+        self.corr_self_coeff[None] = w_self / grid_data['Fz_comsol'] * eta_ratio * L_ratio
+
         # Включить поправку
         self.corr_enabled[None] = 1
 
-        eta_ratio = grid_data['eta_comsol'] / self.eta_oil
         print(f"[DirectDropletForceCalculator] Периодическая поправка загружена: "
               f"сетка {grid_data['grid_resolution']}³, "
-              f"L_ratio={grid_data['L_comsol']/L_sim:.6f}, "
+              f"L_ratio={L_ratio:.6f}, "
               f"Fz_comsol={grid_data['Fz_comsol']:.4e}, "
-              f"eta_ratio={eta_ratio:.6f}")
+              f"eta_ratio={eta_ratio:.6f}, "
+              f"self_coeff={self.corr_self_coeff[None]:.6e}")
 
 
     @staticmethod
@@ -383,6 +393,13 @@ class DirectDropletForceCalculator(ForceCalculator):
                         convection_at_i[0] += gx_x * sx + gy_x * sy + gz_x * sz
                         convection_at_i[1] += gx_y * sx + gy_y * sy + gz_y * sz
                         convection_at_i[2] += gx_z * sx + gy_z * sy + gz_z * sz
+
+            # Self-interaction: вклад периодических образов капли на себя
+            if self.corr_enabled[None] == 1:
+                g_self = self.corr_self_coeff[None]
+                convection_at_i[0] += g_self * ti_fx[i]
+                convection_at_i[1] += g_self * ti_fy[i]
+                convection_at_i[2] += g_self * ti_fz[i]
 
             ti_vx[i] = convection_at_i[0]
             ti_vy[i] = convection_at_i[1]
