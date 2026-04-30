@@ -100,6 +100,12 @@ class SpatialHashCollisionDetector(CollisionDetector):
                     iy = 0
                 if iz < 0:
                     iz = 0
+                if ix >= grid_dim:
+                    ix = grid_dim - 1
+                if iy >= grid_dim:
+                    iy = grid_dim - 1
+                if iz >= grid_dim:
+                    iz = grid_dim - 1
 
             h = self._hash_cell(ix, iy, iz)
             self.particle_cell[i] = h
@@ -154,6 +160,12 @@ class SpatialHashCollisionDetector(CollisionDetector):
                     iy = 0
                 if iz < 0:
                     iz = 0
+                if ix >= grid_dim:
+                    ix = grid_dim - 1
+                if iy >= grid_dim:
+                    iy = grid_dim - 1
+                if iz >= grid_dim:
+                    iz = grid_dim - 1
 
             # Проверяем 27 соседних cells (включая текущую)
             for di in ti.static(range(-1, 2)):
@@ -169,7 +181,8 @@ class SpatialHashCollisionDetector(CollisionDetector):
                             ny = ny % grid_dim
                             nz = nz % grid_dim
                         else:
-                            if nx < 0 or ny < 0 or nz < 0:
+                            if (nx < 0 or ny < 0 or nz < 0
+                                    or nx >= grid_dim or ny >= grid_dim or nz >= grid_dim):
                                 valid = False
 
                         if valid:

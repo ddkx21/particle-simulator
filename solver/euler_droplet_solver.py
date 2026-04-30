@@ -34,9 +34,15 @@ class EulerDropletSolver(Solver):
         Основной метод для решения уравнений движения капель в вязкой жидкости методом Эйлера.
 
         :param dt: Временной шаг симуляции.
-        :param total_time: Общее время моделирования.
+        :param total_time: Длительность моделирования (от текущего времени).
+            При свежем запуске t_start=0, т.е. поведение совпадает с интерпретацией
+            "общее время". При продолжении (continue) — это дополнительное время к уже
+            пройденному.
         """
-        t = 0
+        # Текущее время = старт. Конец = старт + длительность.
+        t = float(self.solution.get_current_time())
+        t_start = t
+        t_end = t_start + float(total_time)
         is_aborted = False
 
         # Засекаем время
@@ -45,7 +51,7 @@ class EulerDropletSolver(Solver):
         last_percent = -1
 
         # Главный цикл симуляции
-        while (t < total_time) and not is_aborted:
+        while (t < t_end) and not is_aborted:
             # Остановка по запросу пользователя
             if self.post_processor.stop_simulation:
                 print("Симуляция остановлена пользователем.")
@@ -54,15 +60,16 @@ class EulerDropletSolver(Solver):
             positions = self.solution.initial_droplet_state.positions
             radii = self.solution.initial_droplet_state.radii
 
-            remaining_steps = int((total_time - t) / dt) + 1
+            remaining_steps = int((t_end - t) / dt) + 1
 
             for step in range(remaining_steps):
                 # Вывод прогресса (внутри цикла, чтобы обновлялся каждый шаг)
-                percent = int(100 * t / total_time)
+                progress_denom = max(t_end - t_start, 1e-12)
+                percent = int(100 * (t - t_start) / progress_denom)
                 if percent != last_percent:
                     last_percent = percent
                     elapsed = time.time() - time_start
-                    print(f"{percent}%: Время: {t:.3f} из {total_time:.3f}, "
+                    print(f"{percent}%: Время: {t:.3f} из {t_end:.3f}, "
                           f"Капель: {self.solution.num_particles}, "
                           f"Прошло: {elapsed:.1f} сек",
                           flush=True)

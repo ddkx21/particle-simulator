@@ -63,7 +63,7 @@ class DropletState(ParticleState):
         data = np.load(filename)
         self.positions = data['positions']
         self.radii = data['radii']
-        self.time = data['time']
+        self.time = float(data['time'])
 
     def export_to_xlsx(self, filename):
         """

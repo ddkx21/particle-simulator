@@ -58,11 +58,25 @@ class DropletSolution(Solution):
         self.current_step += 1
 
         if self.current_step >= self.length:
-            # Удваиваем длинну массивов
-            self.times = np.concatenate((self.times, np.zeros((self.length, 1))), axis=0)
-            self.trajectories = np.concatenate((self.trajectories, np.zeros((self.length, self.num_particles, 3))), axis=0)
-            self.length *= 2
-        
+            # Удваиваем длину буферов через np.empty + slice copy.
+            # В отличие от np.concatenate это не держит одновременно
+            # старый+новый+результат: старые массивы освобождаются сразу
+            # после копирования, что снижает пик RAM на больших N.
+            new_length = self.length * 2
+
+            new_times = np.empty((new_length, 1), dtype=self.times.dtype)
+            new_times[: self.length] = self.times
+            self.times = new_times
+
+            new_traj = np.empty(
+                (new_length, self.num_particles, 3),
+                dtype=self.trajectories.dtype,
+            )
+            new_traj[: self.length] = self.trajectories
+            self.trajectories = new_traj
+
+            self.length = new_length
+
         self.times[self.current_step] = t
         self.trajectories[self.current_step] = positions
 
