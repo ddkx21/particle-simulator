@@ -4,6 +4,8 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Linter: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Type checker: mypy](https://img.shields.io/badge/type%20checker-mypy-blue.svg)](https://mypy-lang.org/)
 
 > Гибридный симулятор движения и коалесценции водяных капель в масле под
 > внешним электрическим полем. Сочетает **DEM** (Discrete Element Method) для
@@ -144,6 +146,17 @@ python compare_pbm_dem.py
 
 ## Тестирование и качество кода
 
+Проект использует следующий tooling (все включены в `pip install -e ".[dev]"`):
+
+| Инструмент | Назначение                            | Конфиг           |
+|------------|---------------------------------------|------------------|
+| `pytest`   | unit/integration-тесты + coverage     | `pyproject.toml` |
+| `ruff`     | линтер (E/F/W/I/B/UP правила)         | `pyproject.toml` |
+| `black`    | автоформаттер (line-length 100)       | `pyproject.toml` |
+| `mypy`     | статическая проверка типов (warn-only)| `pyproject.toml` |
+
+### Локальный прогон
+
 ```bash
 # Все тесты
 pytest tests/
@@ -151,11 +164,24 @@ pytest tests/
 # С покрытием
 pytest tests/ --cov=dem --cov=pbm --cov-report=term-missing
 
-# Линтеры / форматтеры
+# Проверка линтером и форматом (read-only)
 ruff check dem/ pbm/ tests/
 black --check dem/ pbm/ tests/
 mypy dem/ pbm/
+
+# Авто-исправление линт-ошибок и форматирование (перед коммитом)
+ruff check --fix dem/ pbm/ tests/
+black dem/ pbm/ tests/
 ```
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) на каждый push/PR в `master`/`main`
+прогоняет три job'а:
+
+1. **lint** — ruff + black --check + mypy (warn-only).
+2. **test** — pytest с покрытием, артефакты coverage.xml + junit.
+3. **build** — `python -m build` для sdist + wheel (зависит от lint и test).
 
 Подробнее по каждой группе тестов — [`tests/README.md`](tests/README.md).
 

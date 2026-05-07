@@ -104,13 +104,13 @@ EulerDropletSolver(fc, sol, pp, collision_detector=cd).solve(dt=0.04, t_stop=10)
 ## Производительность
 
 <p align="center">
-  <img src=".github/assets/images/heatmap_speedup_N100000.png" width="600">
+  <img src="../.github/assets/images/heatmap_speedup_N100000.png" width="600">
   <br>
   <em>Тепловая карта ускорения</em>
 </p>
 <p align="center">
   <!-- Замените на имя вашего второго графика -->
-  <img src=".github/assets/images/heatmap_error_N100000.png" width="600">
+  <img src="../.github/assets/images/heatmap_error_N100000.png" width="600">
   <br>
   <em>Тепловая карта ошибок</em>
 </p>
