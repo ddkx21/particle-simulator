@@ -1,0 +1,133 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "particle-simulator"
+version = "0.1.0"
+description = "DEM + PBM particle simulator for charged droplet coalescence"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Dadakhodjaev Rustam Bakhtiyorovich", email = "rustam.dadakhodjaev@gmail.com" },
+]
+maintainers = [
+    { name = "Dadakhodjaev Rustam Bakhtiyorovich", email = "rustam.dadakhodjaev@gmail.com" },
+]
+keywords = ["DEM", "PBM", "particle-simulation", "coalescence", "taichi", "octree"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.urls]
+Homepage = "https://github.com/ddkx21/particle-simulator"
+Repository = "https://github.com/ddkx21/particle-simulator"
+Issues = "https://github.com/ddkx21/particle-simulator/issues"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+    "taichi>=1.7.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-benchmark>=4.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "black>=24.0",
+    "vulture>=2.10",
+]
+
+[tool.setuptools.packages.find]
+include = ["dem*", "pbm*"]
+exclude = ["tests*", "studies*", "benchmarks*", "results*", "docs*", "convergence_test*", "dual_ensemble*"]
+
+[tool.setuptools.package-data]
+"dem.periodic_correction" = ["data/*.txt", "data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: помечает медленные тесты (requires --runslow)",
+]
+
+[tool.coverage.run]
+source = ["dem", "pbm"]
+omit = [
+    "*/__pycache__/*",
+    "*/setup.py",
+    "*/test_*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "results",
+    "convergence_test",
+    "studies",
+    "benchmarks",
+    "dual_ensemble",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # длинные строки разрешены (формулы, комментарии)
+    "E741",  # l/L как имена допустимы — это размер ячейки
+    "B008",  # default args в виде вызовов (numpy arrays) допустимы
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["B011"]  # assert False допустим в тестах
+"dem/**/__init__.py" = ["F401"]  # re-exports
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+extend-exclude = '''
+/(
+    results
+  | convergence_test
+  | studies
+  | benchmarks
+  | dual_ensemble
+  | \.venv
+)/
+'''
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = [
+    "results/",
+    "convergence_test/",
+    "studies/",
+    "benchmarks/",
+    "dual_ensemble/",
+    "tests/",
+]

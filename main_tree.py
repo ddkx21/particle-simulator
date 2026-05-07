@@ -1,14 +1,13 @@
 import time
 import numpy as np
-from datetime import datetime
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import *
-from octree.force_tree import TreeDropletForceCalculator
-from particle_generator import *
-from particle_state import *
-from post_processor import *
-from solution import *
-from solver import *
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import *
+from dem.octree.force_tree import TreeDropletForceCalculator
+from dem.particle_generator import *
+from dem.particle_state import *
+from dem.post_processor import *
+from dem.solution import *
+from dem.solver import *
 
 import taichi as ti
 
@@ -16,8 +15,6 @@ import taichi as ti
 n_of_threads = 16
 ti.init(arch=ti.cpu, cpu_max_num_threads=n_of_threads, default_fp=ti.f64)  # Параллельный расчёт на CPU
 
-import cProfile
-import pstats
 #import tracemalloc
 
 def main():
@@ -95,7 +92,7 @@ def main():
     if use_periodic_correction:
         if boundary_mode != "periodic":
             raise ValueError("use_periodic_correction=True требует boundary_mode='periodic'")
-        from periodic_correction import COMSOLLatticeCorrection
+        from dem.periodic_correction import COMSOLLatticeCorrection
         lattice_correction = COMSOLLatticeCorrection.load_default()
 
     # Создаем необходимые объекты
@@ -126,13 +123,13 @@ def main():
     _ = force_calculator.octree.compute_forces(force_calculator.m_const)
     _compute_ms = (time.perf_counter() - _t0) * 1000
 
-    from octree import compute_tree_stats, print_tree_stats
+    from dem.octree import compute_tree_stats, print_tree_stats
     stats = compute_tree_stats(force_calculator.octree, build_time_ms=_build_ms, compute_time_ms=_compute_ms)
     print_tree_stats(stats)
 
     VISUALIZE_TREE = True
     if VISUALIZE_TREE:
-        from octree import visualize_tree
+        from dem.octree import visualize_tree
         visualize_tree(force_calculator.octree, _positions, _radii)
 
     # Запуск решения

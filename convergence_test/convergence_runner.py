@@ -42,7 +42,7 @@ def _compute_pseudo(positions: np.ndarray, radii: np.ndarray,
     N = positions.shape[0]
 
     if method == "direct":
-        from force_calculator.direct_droplet_force_calculator import DirectDropletForceCalculator
+        from dem.force_calculator.direct_droplet_force_calculator import DirectDropletForceCalculator
         calc = DirectDropletForceCalculator(
             num_particles=N,
             eps_oil=eps_oil, eta_oil=eta_oil, E=E,
@@ -51,7 +51,7 @@ def _compute_pseudo(positions: np.ndarray, radii: np.ndarray,
         )
         calc.load_periodic_correction(correction, L_sim=L)
     else:
-        from octree.force_tree import TreeDropletForceCalculator
+        from dem.octree.force_tree import TreeDropletForceCalculator
         calc = TreeDropletForceCalculator(
             num_particles=N,
             theta=0.5, mpl=1,
@@ -92,7 +92,7 @@ class ConvergenceTest:
             N, K, err_F_direct, err_V_direct, time_ref, time_pseudo_direct
         """
         import os
-        from periodic_correction import COMSOLLatticeCorrection
+        from dem.periodic_correction import COMSOLLatticeCorrection
 
         os.makedirs(results_dir, exist_ok=True)
         correction = COMSOLLatticeCorrection.load_default()

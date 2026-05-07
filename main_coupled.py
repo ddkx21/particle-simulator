@@ -4,23 +4,20 @@ DEM-симуляция с октодеревом, PBM получает данн�
 и распределении, решает уравнения популяционного баланса параллельно.
 """
 
-import time
 import numpy as np
 import taichi as ti
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import *
-from octree.force_tree import TreeDropletForceCalculator
-from particle_generator import *
-from particle_state import *
-from post_processor import *
-from solution import *
-from solver import *
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import *
+from dem.octree.force_tree import TreeDropletForceCalculator
+from dem.particle_generator import *
+from dem.particle_state import *
+from dem.post_processor import *
+from dem.solution import *
+from dem.solver import *
 
 from pbm import VolumeGrid, PBMSolver
 from pbm.kernels import AnalyticalElectrostaticKernel
 from pbm.coupling import DEMPBMCoupling
-
-import taichi as ti
 
 n_of_threads = 16
 ti.init(arch=ti.cpu, cpu_max_num_threads=n_of_threads, default_fp=ti.f64)
@@ -29,7 +26,7 @@ ti.init(arch=ti.cpu, cpu_max_num_threads=n_of_threads, default_fp=ti.f64)
 def main() -> None:
     # Параметры симуляции
     radii_range = np.array([2.5e-6, 7.5e-6])
-    num_particles = 1000
+    num_particles = 100
     water_volume_content = 0.02
 
     box_size = np.cbrt(
@@ -41,7 +38,7 @@ def main() -> None:
     t_stop = 100
     dt = 0.04
 
-    real_time_visualization = False
+    real_time_visualization = True
 
     should_use_saved_initial_data = True
     filenumber = 0
@@ -54,12 +51,12 @@ def main() -> None:
     eta_water = 0.001
     E = 3e5
 
-    boundary_mode = "periodic"
-    use_periodic_correction = True
+    boundary_mode = "open"
+    use_periodic_correction = False
 
     # Параметры дерева
     theta = 0.35
-    mpl = 1
+    mpl = 4
 
     # PBM параметры
     pbm_n_bins = 50
@@ -84,7 +81,7 @@ def main() -> None:
     # Периодическая поправка COMSOL
     lattice_correction = None
     if use_periodic_correction:
-        from periodic_correction import COMSOLLatticeCorrection
+        from dem.periodic_correction import COMSOLLatticeCorrection
         lattice_correction = COMSOLLatticeCorrection.load_default()
 
     # Force calculator
@@ -117,14 +114,12 @@ def main() -> None:
     post_processor = DropletPostProcessor(solution, box_size=box_size)
 
     # PBM setup
-    grid = VolumeGrid.from_radii_range(
-        radii_range[0], radii_range[1] * 3, pbm_n_bins, spacing="geometric",
-    )
+    grid = VolumeGrid.from_radii_range(radii_range[0], radii_range[1] * 10, pbm_n_bins, spacing="geometric")
     kernel = AnalyticalElectrostaticKernel(eps0, eps_oil, E, eta_oil)
     Q = kernel.build_matrix(grid)
     pbm_solver = PBMSolver(
         grid, Q, method="cell_average", integrator="BDF",
-        scale_factor=num_particles,
+        domain_volume=domain_volume,
     )
 
     coupling = DEMPBMCoupling(

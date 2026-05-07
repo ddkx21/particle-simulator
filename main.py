@@ -1,13 +1,12 @@
 import time
 import numpy as np
-from datetime import datetime
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import *
-from particle_generator import *
-from particle_state import *
-from post_processor import *
-from solution import *
-from solver import *
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import *
+from dem.particle_generator import *
+from dem.particle_state import *
+from dem.post_processor import *
+from dem.solution import *
+from dem.solver import *
 
 import taichi as ti
 
@@ -90,7 +89,7 @@ def main():
     if use_periodic_correction:
         if boundary_mode != "periodic":
             raise ValueError("use_periodic_correction=True требует boundary_mode='periodic'")
-        from periodic_correction import COMSOLLatticeCorrection
+        from dem.periodic_correction import COMSOLLatticeCorrection
         lattice_correction = COMSOLLatticeCorrection.load_default()
 
     # Создаем необходимые объекты

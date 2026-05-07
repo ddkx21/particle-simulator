@@ -21,13 +21,13 @@ from scipy.stats import gaussian_kde
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import DirectDropletForceCalculator
-from particle_generator import UniformDropletGenerator
-from particle_state import DropletState
-from post_processor import DropletPostProcessor
-from solution import DropletSolution
-from solver import EulerDropletSolver
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import DirectDropletForceCalculator
+from dem.particle_generator import UniformDropletGenerator
+from dem.particle_state import DropletState
+from dem.post_processor import DropletPostProcessor
+from dem.solution import DropletSolution
+from dem.solver import EulerDropletSolver
 
 import taichi as ti
 

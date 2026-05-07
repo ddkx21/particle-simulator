@@ -1,12 +1,11 @@
 import time
 import numpy as np
-from datetime import datetime
-from force_calculator import *
-from particle_generator import *
-from particle_state import *
-from post_processor import *
-from solution import *
-from solver import *
+from dem.force_calculator import *
+from dem.particle_generator import *
+from dem.particle_state import *
+from dem.post_processor import *
+from dem.solution import *
+from dem.solver import *
 
 import taichi as ti
 ti.init(arch=ti.cpu, cpu_max_num_threads=16, default_fp=ti.f64)  # Параллельный расчёт на CPU

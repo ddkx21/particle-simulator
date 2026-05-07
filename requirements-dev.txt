@@ -1,0 +1,18 @@
+# Development dependencies (Python 3.12)
+# Установка:
+#   pip install -r requirements.txt -r requirements-dev.txt
+# или (рекомендуемый способ):
+#   pip install -e ".[dev]"
+
+-r requirements.txt
+
+# Тестирование
+pytest>=7.0
+pytest-cov>=4.0
+pytest-benchmark>=4.0
+
+# Линтеры / форматтеры / типизация
+ruff>=0.6
+black>=24.0
+mypy>=1.10
+vulture>=2.10

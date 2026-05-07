@@ -20,7 +20,7 @@ def main() -> None:
     # Параметры частиц
     r_min, r_max = 2.5e-6, 7.5e-6
     n_bins = 50
-    total_particles = 100_000
+    total_particles = 1_000
 
     # Время
     t_end = 50.0
@@ -38,10 +38,11 @@ def main() -> None:
     kernel = AnalyticalElectrostaticKernel(eps0, eps_oil, E, eta_oil)
     Q = kernel.build_matrix(grid)
 
-    # PBM солвер (Cell-Average)
+    # PBM солвер (Cell-Average). domain_volume=1 даёт «стандартный» PBM без
+    # деления на физический объём — для standalone сценария это допустимо.
     solver = PBMSolver(
         grid, Q, method="cell_average", integrator="BDF",
-        scale_factor=total_particles,
+        domain_volume=1.0,
     )
     t_eval = np.linspace(0, t_end, n_time_points)
 

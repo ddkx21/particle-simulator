@@ -61,13 +61,13 @@ def run_single_system(
     cfg: dict,
     initial_state_path: str | None = None,
 ) -> dict:
-    from collision_detector import SpatialHashCollisionDetector
-    from octree.force_tree import TreeDropletForceCalculator
-    from particle_generator import UniformDropletGenerator
-    from particle_state import DropletState
-    from post_processor import DropletPostProcessor
-    from solution import DropletSolution
-    from solver import EulerDropletSolver
+    from dem.collision_detector import SpatialHashCollisionDetector
+    from dem.octree.force_tree import TreeDropletForceCalculator
+    from dem.particle_generator import UniformDropletGenerator
+    from dem.particle_state import DropletState
+    from dem.post_processor import DropletPostProcessor
+    from dem.solution import DropletSolution
+    from dem.solver import EulerDropletSolver
 
     phys = cfg["physics"]
     tree_cfg = cfg["tree"]

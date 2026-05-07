@@ -5,8 +5,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
-from solution import DropletSolution
-from particle_state import DropletState
+from dem.solution import DropletSolution
+from dem.particle_state import DropletState
 
 """
 Скрипт для создания GIF анимации эволюции системы капель из NPZ файлов.

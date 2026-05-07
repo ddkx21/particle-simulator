@@ -395,3 +395,14 @@ python main_pbm.py
 # DEM + PBM (требует Taichi и начальные данные)
 .venv/bin/python main_coupled.py
 ```
+
+---
+
+## Автор и контакты
+
+**Dadakhodjaev Rustam Bakhtiyorovich**
+[rustam.dadakhodjaev@gmail.com](mailto:rustam.dadakhodjaev@gmail.com) ·
+[st094266@student.spbu.ru](mailto:st094266@student.spbu.ru) ·
+Telegram: [@ddkx21](https://t.me/ddkx21)
+
+Лицензия: [MIT](../LICENSE) — см. корневой [README](../README.md).

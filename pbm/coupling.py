@@ -77,18 +77,57 @@ class DEMPBMCoupling:
             return
 
         K_dem = self._dem_kernel.finalize()
-        if np.any(K_dem > 0):
+        # Q_dem и аналитический Q теперь имеют одинаковую размерность (м³/с),
+        # так что прямое сравнение корректно.
+        Q_current_max = float(np.max(self.pbm_solver.Q)) if self.pbm_solver.Q is not None else 0.0
+        K_dem_max = float(np.max(K_dem)) if K_dem.size else 0.0
+        sanity_threshold = max(Q_current_max * 1e2, 1e-18)
+        kernel_updated = False
+        if np.any(~np.isfinite(K_dem)):
+            logger.warning("K_dem содержит NaN/inf — пропускаем обновление ядра")
+        elif K_dem_max > sanity_threshold:
+            logger.warning(
+                "K_dem max=%.3e существенно больше текущего Q max=%.3e — "
+                "статистика DEM пока недостаточна, пропускаем обновление ядра",
+                K_dem_max, Q_current_max,
+            )
+        elif np.any(K_dem > 0):
             self.pbm_solver.update_kernel(K_dem)
-            self._dem_kernel.reset()
+            kernel_updated = True
+        # Всегда сбрасываем накопители DEM-кернела, иначе при sanity-fail
+        # bias накапливается между неудачными попытками
+        self._dem_kernel.reset()
 
-        result = self.pbm_solver.solve(
-            self._pbm_N,
-            (self._pbm_time, current_time),
-            rtol=1e-5,
-            atol=1e-5,
-        )
+        # atol адаптивно: ~1e-6 от суммарного числа частиц, но не меньше 1e-3
+        total = float(np.sum(self._pbm_N))
+        atol = max(1e-3, 1e-6 * total) if total > 0 else 1e-3
 
-        self._pbm_N = result["N"][-1]
+        try:
+            result = self.pbm_solver.solve(
+                self._pbm_N,
+                (self._pbm_time, current_time),
+                rtol=1e-4,
+                atol=atol,
+            )
+        except RuntimeError as exc:
+            logger.error("PBM solve_ivp упал: %s — состояние не обновляется", exc)
+            self._last_sync_time = current_time
+            return
+
+        N_new = result["N"][-1]
+        if np.any(~np.isfinite(N_new)):
+            logger.error(
+                "PBM solve вернул NaN/inf: t=%.3f→%.3f, N0_sum=%.3e, Q_max=%.3e",
+                self._pbm_time, current_time,
+                float(np.sum(self._pbm_N)),
+                float(np.max(self.pbm_solver.Q)),
+            )
+            self._last_sync_time = current_time
+            return
+        # Небольшие отрицательные значения — численный шум BDF, клиппим к 0
+        np.maximum(N_new, 0.0, out=N_new)
+
+        self._pbm_N = N_new
         self._pbm_time = current_time
         self._last_sync_time = current_time
 
@@ -97,11 +136,11 @@ class DEMPBMCoupling:
         self.history_dem_N.append(dem_N)
         self.history_pbm_N.append(self._pbm_N.copy())
 
-        total_dem = np.sum(dem_N)
         total_pbm = np.sum(self._pbm_N)
         logger.info(
-            "t=%.2f  DEM particles=%d  PBM total=%.0f",
+            "t=%.2f  DEM particles=%d  PBM total=%.1f  Q_max=%.3e  K_dem_max=%.3e  upd=%s",
             current_time, len(radii), total_pbm,
+            Q_current_max, K_dem_max, kernel_updated,
         )
 
     def get_pbm_distribution(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:

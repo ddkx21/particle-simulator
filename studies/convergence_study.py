@@ -15,13 +15,13 @@ from scipy.stats import gaussian_kde
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import *
-from particle_generator import *
-from particle_state import *
-from post_processor import *
-from solution import *
-from solver import *
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import *
+from dem.particle_generator import *
+from dem.particle_state import *
+from dem.post_processor import *
+from dem.solution import *
+from dem.solver import *
 import taichi as ti
 
 n_of_threads = 16

@@ -17,10 +17,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 ti.init(arch=ti.cpu, default_fp=ti.f64)  # Параллельный расчёт на CPU
 
-from octree.force_tree import TreeDropletForceCalculator
-from force_calculator import DirectDropletForceCalculator
-from particle_generator import UniformDropletGenerator
-from particle_state import DropletState
+from dem.octree.force_tree import TreeDropletForceCalculator
+from dem.force_calculator import DirectDropletForceCalculator
+from dem.particle_generator import UniformDropletGenerator
+from dem.particle_state import DropletState
 
 # ── Параметры ────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

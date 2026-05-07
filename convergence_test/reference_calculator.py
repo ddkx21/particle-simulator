@@ -33,7 +33,7 @@ def compute_reference(positions: np.ndarray, radii: np.ndarray,
     :param correction: объект COMSOLLatticeCorrection
     :return: (forces (N,3), velocities (N,3)) для центральных частиц
     """
-    from force_calculator.direct_droplet_force_calculator import DirectDropletForceCalculator
+    from dem.force_calculator.direct_droplet_force_calculator import DirectDropletForceCalculator
 
     N = positions.shape[0]
     N_total = K**3 * N

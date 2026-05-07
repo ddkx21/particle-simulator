@@ -23,15 +23,15 @@ matplotlib.use('Agg')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-from collision_detector import SpatialHashCollisionDetector
-from force_calculator import DirectDropletForceCalculator
-from octree.force_tree import TreeDropletForceCalculator
-from particle_generator import UniformDropletGenerator
-from particle_state import DropletState
-from post_processor import DropletPostProcessor
-from solution import DropletSolution
-from solver import EulerDropletSolver
-from periodic_correction import COMSOLLatticeCorrection
+from dem.collision_detector import SpatialHashCollisionDetector
+from dem.force_calculator import DirectDropletForceCalculator
+from dem.octree.force_tree import TreeDropletForceCalculator
+from dem.particle_generator import UniformDropletGenerator
+from dem.particle_state import DropletState
+from dem.post_processor import DropletPostProcessor
+from dem.solution import DropletSolution
+from dem.solver import EulerDropletSolver
+from dem.periodic_correction import COMSOLLatticeCorrection
 
 import taichi as ti
 
