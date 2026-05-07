@@ -25,11 +25,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-
-[project.urls]
-Homepage = "https://github.com/ddkx21/particle-simulator"
-Repository = "https://github.com/ddkx21/particle-simulator"
-Issues = "https://github.com/ddkx21/particle-simulator/issues"
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
@@ -39,6 +34,11 @@ dependencies = [
     "taichi>=1.7.0",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ddkx21/particle-simulator"
+Repository = "https://github.com/ddkx21/particle-simulator"
+Issues = "https://github.com/ddkx21/particle-simulator/issues"
 
 [project.optional-dependencies]
 dev = [
