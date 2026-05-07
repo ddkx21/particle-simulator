@@ -1,4 +1,5 @@
 """Тесты pbm/kernels/dem_extracted_kernel.py — DEMExtractedKernel."""
+
 from __future__ import annotations
 
 from pathlib import Path

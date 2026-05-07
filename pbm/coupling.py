@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
-from pbm.volume_grid import VolumeGrid
 from pbm.kernels.dem_extracted_kernel import DEMExtractedKernel
+from pbm.volume_grid import VolumeGrid
 
 if TYPE_CHECKING:
     from pbm.pbm_solver import PBMSolver
@@ -89,7 +89,8 @@ class DEMPBMCoupling:
             logger.warning(
                 "K_dem max=%.3e существенно больше текущего Q max=%.3e — "
                 "статистика DEM пока недостаточна, пропускаем обновление ядра",
-                K_dem_max, Q_current_max,
+                K_dem_max,
+                Q_current_max,
             )
         elif np.any(K_dem > 0):
             self.pbm_solver.update_kernel(K_dem)
@@ -118,7 +119,8 @@ class DEMPBMCoupling:
         if np.any(~np.isfinite(N_new)):
             logger.error(
                 "PBM solve вернул NaN/inf: t=%.3f→%.3f, N0_sum=%.3e, Q_max=%.3e",
-                self._pbm_time, current_time,
+                self._pbm_time,
+                current_time,
                 float(np.sum(self._pbm_N)),
                 float(np.max(self.pbm_solver.Q)),
             )
@@ -139,8 +141,12 @@ class DEMPBMCoupling:
         total_pbm = np.sum(self._pbm_N)
         logger.info(
             "t=%.2f  DEM particles=%d  PBM total=%.1f  Q_max=%.3e  K_dem_max=%.3e  upd=%s",
-            current_time, len(radii), total_pbm,
-            Q_current_max, K_dem_max, kernel_updated,
+            current_time,
+            len(radii),
+            total_pbm,
+            Q_current_max,
+            K_dem_max,
+            kernel_updated,
         )
 
     def get_pbm_distribution(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:

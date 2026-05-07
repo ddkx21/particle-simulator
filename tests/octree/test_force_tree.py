@@ -2,6 +2,7 @@
 
 Cравнивает результат с эталонным DirectDropletForceCalculator на тех же входах.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -27,12 +28,10 @@ class TestForcesVsDirect:
         positions = rng.random((n, 3)) * L
         radii = rng.random(n) * 30e-6 + 20e-6
 
-        direct = DirectDropletForceCalculator(num_particles=n, L=L,
-                                              boundary_mode="open")
+        direct = DirectDropletForceCalculator(num_particles=n, L=L, boundary_mode="open")
         f_d = direct.calculate(positions, radii)
 
-        tree = TreeDropletForceCalculator(num_particles=n, theta=0.3,
-                                          mpl=1, L=L, periodic=False)
+        tree = TreeDropletForceCalculator(num_particles=n, theta=0.3, mpl=1, L=L, periodic=False)
         f_t = tree.calculate(positions, radii)
 
         err = _relative_error(f_d, f_t)
@@ -50,13 +49,11 @@ class TestConvectionVsDirect:
         positions = rng.random((n, 3)) * L
         radii = rng.random(n) * 30e-6 + 20e-6
 
-        direct = DirectDropletForceCalculator(num_particles=n, L=L,
-                                              boundary_mode="open")
+        direct = DirectDropletForceCalculator(num_particles=n, L=L, boundary_mode="open")
         f_d = direct.calculate(positions, radii)
         v_d = direct.calculate_convection(positions, radii, f_d)
 
-        tree = TreeDropletForceCalculator(num_particles=n, theta=0.3,
-                                          mpl=1, L=L, periodic=False)
+        tree = TreeDropletForceCalculator(num_particles=n, theta=0.3, mpl=1, L=L, periodic=False)
         f_t = tree.calculate(positions, radii)
         v_t = tree.calculate_convection(positions, radii, f_t)
 
@@ -75,14 +72,14 @@ class TestThetaConvergence:
         positions = rng.random((n, 3)) * L
         radii = rng.random(n) * 30e-6 + 20e-6
 
-        direct = DirectDropletForceCalculator(num_particles=n, L=L,
-                                              boundary_mode="open")
+        direct = DirectDropletForceCalculator(num_particles=n, L=L, boundary_mode="open")
         f_d = direct.calculate(positions, radii)
 
         prev_err = float("inf")
         for theta in (0.8, 0.5, 0.3):
-            tree = TreeDropletForceCalculator(num_particles=n, theta=theta,
-                                              mpl=1, L=L, periodic=False)
+            tree = TreeDropletForceCalculator(
+                num_particles=n, theta=theta, mpl=1, L=L, periodic=False
+            )
             f_t = tree.calculate(positions, radii)
             err = float(np.mean(_relative_error(f_d, f_t)))
             assert err <= prev_err + 1e-4

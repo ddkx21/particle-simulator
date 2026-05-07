@@ -1,10 +1,11 @@
 """Тесты pbm/pbm_solver.py — PBMSolver (cell_average и fixed_pivot)."""
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from pbm import VolumeGrid, PBMSolver
+from pbm import PBMSolver, VolumeGrid
 from pbm.kernels import AnalyticalElectrostaticKernel
 
 
@@ -40,15 +41,13 @@ class TestCellAverageMethod:
 
     def test_volume_conservation(self) -> None:
         g, N0, solver = self._setup()
-        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6),
-                           rtol=1e-6, atol=1e-3)
+        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6), rtol=1e-6, atol=1e-3)
         rel_err = (res["total_volume"][-1] - res["total_volume"][0]) / res["total_volume"][0]
         assert abs(rel_err) < 1e-6
 
     def test_count_decreases(self) -> None:
         g, N0, solver = self._setup()
-        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6),
-                           rtol=1e-6, atol=1e-3)
+        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6), rtol=1e-6, atol=1e-3)
         diffs = np.diff(res["total_count"])
         assert np.all(diffs <= 1e-6)
         assert res["total_count"][-1] < res["total_count"][0]
@@ -65,8 +64,7 @@ class TestFixedPivotMethod:
         N0 = g.histogram(radii)
         Q = AnalyticalElectrostaticKernel().build_matrix(g)
         solver = PBMSolver(g, Q, method="fixed_pivot", domain_volume=1.0)
-        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6),
-                           rtol=1e-6, atol=1e-3)
+        res = solver.solve(N0, (0, 50.0), t_eval=np.linspace(0, 50, 6), rtol=1e-6, atol=1e-3)
         rel_err = (res["total_volume"][-1] - res["total_volume"][0]) / res["total_volume"][0]
         assert abs(rel_err) < 1e-6
 
@@ -86,8 +84,9 @@ class TestFixedPivotMethod:
 class TestSolverRuntime:
     def test_update_kernel_replaces_Q(self) -> None:
         g = VolumeGrid(1.0, 100.0, 8)
-        solver = PBMSolver(g, np.zeros((g.n_bins, g.n_bins)),
-                           method="fixed_pivot", domain_volume=1.0)
+        solver = PBMSolver(
+            g, np.zeros((g.n_bins, g.n_bins)), method="fixed_pivot", domain_volume=1.0
+        )
         Q_new = np.ones((g.n_bins, g.n_bins))
         solver.update_kernel(Q_new)
         np.testing.assert_array_equal(solver.Q, Q_new)
@@ -96,8 +95,7 @@ class TestSolverRuntime:
         """Жёсткая система + микроскопические допуски → solve_ivp падает."""
         g = VolumeGrid(1.0, 100.0, 8)
         Q = np.full((g.n_bins, g.n_bins), 1e30)
-        solver = PBMSolver(g, Q, method="cell_average", domain_volume=1e-30,
-                           integrator="LSODA")
+        solver = PBMSolver(g, Q, method="cell_average", domain_volume=1e-30, integrator="LSODA")
         N0 = np.full(g.n_bins, 1e10)
         with pytest.raises(RuntimeError, match="PBM"):
             solver.solve(N0, (0.0, 1e6), rtol=1e-15, atol=1e-15)

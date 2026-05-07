@@ -2,27 +2,31 @@
 
 Использует FlatOctree (Taichi). Инициализация Taichi — в conftest.py.
 """
+
 from __future__ import annotations
 
 import numpy as np
 
+from dem.octree.flat_tree import FlatOctree
 from pbm import VolumeGrid
 from pbm.collision_frequency import TreeCollisionFrequency
-from dem.octree.flat_tree import FlatOctree
 
 
 class TestTreeCollisionFrequency:
     def test_compute_returns_symmetric_matrix(self) -> None:
         n = 6
         L = 1.0
-        positions = np.array([
-            [0.10, 0.10, 0.10],
-            [0.12, 0.10, 0.10],   # контакт с #0
-            [0.50, 0.50, 0.50],
-            [0.80, 0.10, 0.10],
-            [0.10, 0.80, 0.10],
-            [0.10, 0.10, 0.80],
-        ], dtype=np.float64)
+        positions = np.array(
+            [
+                [0.10, 0.10, 0.10],
+                [0.12, 0.10, 0.10],  # контакт с #0
+                [0.50, 0.50, 0.50],
+                [0.80, 0.10, 0.10],
+                [0.10, 0.80, 0.10],
+                [0.10, 0.10, 0.80],
+            ],
+            dtype=np.float64,
+        )
         radii = np.full(n, 0.025, dtype=np.float64)
 
         tree = FlatOctree(theta=0.5, mpl=1, num_particles=n)
@@ -39,12 +43,15 @@ class TestTreeCollisionFrequency:
     def test_no_overlap_returns_zero_matrix(self) -> None:
         n = 4
         L = 1.0
-        positions = np.array([
-            [0.10, 0.10, 0.10],
-            [0.90, 0.10, 0.10],
-            [0.10, 0.90, 0.10],
-            [0.10, 0.10, 0.90],
-        ], dtype=np.float64)
+        positions = np.array(
+            [
+                [0.10, 0.10, 0.10],
+                [0.90, 0.10, 0.10],
+                [0.10, 0.90, 0.10],
+                [0.10, 0.10, 0.90],
+            ],
+            dtype=np.float64,
+        )
         radii = np.full(n, 0.01, dtype=np.float64)
 
         tree = FlatOctree(theta=0.5, mpl=1, num_particles=n)
@@ -58,10 +65,13 @@ class TestTreeCollisionFrequency:
     def test_periodic_boundary_records_contact(self) -> None:
         n = 2
         L = 1.0
-        positions = np.array([
-            [0.01, 0.5, 0.5],
-            [0.99, 0.5, 0.5],
-        ], dtype=np.float64)
+        positions = np.array(
+            [
+                [0.01, 0.5, 0.5],
+                [0.99, 0.5, 0.5],
+            ],
+            dtype=np.float64,
+        )
         radii = np.full(n, 0.05, dtype=np.float64)
         g = VolumeGrid.from_radii_range(0.02, 0.1, 3)
 

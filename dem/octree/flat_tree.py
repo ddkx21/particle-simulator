@@ -18,8 +18,9 @@
     Используется для early-skip (cnt==0) в force/stokeslet kernels.
 """
 
-import taichi as ti
 import numpy as np
+import taichi as ti
+
 from .octree_node import OctreeNode
 
 # Минимальный порог R³ суммы для пропуска пустых/ничтожных узлов в force kernel.
@@ -42,9 +43,13 @@ class FlatOctree:
     - num_particles: начальная ёмкость
     """
 
-    def __init__(self, theta: float = 0.5, mpl: int = 1,
-                 num_particles: int = 10000,
-                 correction_grid_resolution: int = 0):
+    def __init__(
+        self,
+        theta: float = 0.5,
+        mpl: int = 1,
+        num_particles: int = 10000,
+        correction_grid_resolution: int = 0,
+    ):
         self.theta = theta
         self.mpl = mpl
 
@@ -104,7 +109,6 @@ class FlatOctree:
         self.L = ti.field(dtype=ti.f64, shape=())
         self.periodic = ti.field(dtype=ti.i32, shape=())
 
-
         # Предвыделенные выходные массивы (переиспользуются каждый шаг для снижения нагрузки на аллокатор)
         self._out_fx = np.zeros(n, dtype=np.float64)
         self._out_fy = np.zeros(n, dtype=np.float64)
@@ -141,15 +145,15 @@ class FlatOctree:
                 "correction_grid_resolution=0: Taichi-поля для поправки не выделены."
             )
         grid_data = correction.get_grid_data()
-        self.corr_grid_u.from_numpy(grid_data['grid_u'])
-        self.corr_grid_v.from_numpy(grid_data['grid_v'])
-        self.corr_grid_w.from_numpy(grid_data['grid_w'])
-        self.corr_grid_min[None] = grid_data['grid_min']
-        self.corr_grid_inv_dx[None] = 1.0 / grid_data['grid_dx']
-        self.corr_grid_n[None] = grid_data['grid_resolution']
-        self.corr_Fz_inv[None] = 1.0 / grid_data['Fz_comsol']
-        self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
-        eta_comsol = grid_data['eta_comsol']
+        self.corr_grid_u.from_numpy(grid_data["grid_u"])
+        self.corr_grid_v.from_numpy(grid_data["grid_v"])
+        self.corr_grid_w.from_numpy(grid_data["grid_w"])
+        self.corr_grid_min[None] = grid_data["grid_min"]
+        self.corr_grid_inv_dx[None] = 1.0 / grid_data["grid_dx"]
+        self.corr_grid_n[None] = grid_data["grid_resolution"]
+        self.corr_Fz_inv[None] = 1.0 / grid_data["Fz_comsol"]
+        self.corr_L_ratio[None] = grid_data["L_comsol"] / L_sim
+        eta_comsol = grid_data["eta_comsol"]
         eta_ratio = eta_comsol / eta_sim if eta_sim is not None else 1.0
         self.corr_eta_ratio[None] = eta_ratio
 
@@ -157,8 +161,8 @@ class FlatOctree:
         r0 = np.array([[0.0, 0.0, 0.0]])
         G_z_at_origin = correction.evaluate(r0)
         w_self = float(G_z_at_origin[0, 2])
-        L_ratio = grid_data['L_comsol'] / L_sim
-        self.corr_self_coeff[None] = w_self / grid_data['Fz_comsol'] * eta_ratio * L_ratio
+        L_ratio = grid_data["L_comsol"] / L_sim
+        self.corr_self_coeff[None] = w_self / grid_data["Fz_comsol"] * eta_ratio * L_ratio
 
         self.corr_enabled[None] = 1
 
@@ -173,8 +177,7 @@ class FlatOctree:
     # Построение — послойное
     # =================================================================
 
-    def build(self, positions: np.ndarray, radii: np.ndarray,
-              L: float, periodic: bool = False):
+    def build(self, positions: np.ndarray, radii: np.ndarray, L: float, periodic: bool = False):
         """Построить октодерево послойно."""
         n = positions.shape[0]
 
@@ -205,7 +208,7 @@ class FlatOctree:
         # Послойное построение
         MAX_LEVELS = 40
         self._parent_level_offsets = []
-        for level in range(MAX_LEVELS):
+        for _level in range(MAX_LEVELS):
             self.overflow_flag[None] = 0
             parent_count_before = self.parent_count[None]
 
@@ -267,13 +270,14 @@ class FlatOctree:
             self.part_node[i] = 0
 
     @ti.kernel
-    def _update_particles(self, positions: ti.types.ndarray(),
-                          radii: ti.types.ndarray(), n: ti.i32):
+    def _update_particles(
+        self, positions: ti.types.ndarray(), radii: ti.types.ndarray(), n: ti.i32
+    ):
         self.num_particles[None] = n
         for i in range(n):
-            self.particle_positions[i] = ti.Vector([
-                positions[i, 0], positions[i, 1], positions[i, 2]
-            ])
+            self.particle_positions[i] = ti.Vector(
+                [positions[i, 0], positions[i, 1], positions[i, 2]]
+            )
             self.particle_radii[i] = radii[i]
 
     @ti.kernel
@@ -316,8 +320,7 @@ class FlatOctree:
         ti.loop_config(serialize=True)
         for node in range(lstart, lend):
             # Обрабатываем только листья с избыточным числом частиц
-            if (self.nodes.first_child[node] < 0 and
-                    self.nodes.count[node] > mpl):
+            if self.nodes.first_child[node] < 0 and self.nodes.count[node] > mpl:
                 # Защита от переполнения: проверяем наличие места для 8 новых узлов
                 base = self.node_count[None]
                 if base + 8 > self.nodes.max_nodes:
@@ -345,8 +348,7 @@ class FlatOctree:
                     mx_y = self.nodes.max_y[node] if (oct & 2) else cy
                     mx_z = self.nodes.max_z[node] if (oct & 4) else cz
                     # указатель next будет установлен в _build_next_pointers
-                    self.nodes.init_node(child, mn_x, mn_y, mn_z,
-                                         mx_x, mx_y, mx_z, -1)
+                    self.nodes.init_node(child, mn_x, mn_y, mn_z, mx_x, mx_y, mx_z, -1)
                     self.nodes.count[child] = self.node_child_cnt[node, oct]
 
                 self.overflow_flag[None] = 1
@@ -478,8 +480,11 @@ class FlatOctree:
             self.nodes.force_sum_y[idx] = 0.0
             self.nodes.force_sum_z[idx] = 0.0
 
-            if (self.nodes.is_leaf(idx) and self.nodes.count[idx] > 0
-                    and self.nodes.leaf_start[idx] >= 0):
+            if (
+                self.nodes.is_leaf(idx)
+                and self.nodes.count[idx] > 0
+                and self.nodes.leaf_start[idx] >= 0
+            ):
                 ls = self.nodes.leaf_start[idx]
                 cnt = self.nodes.count[idx]
                 r3_sum = ti.f64(0.0)
@@ -491,7 +496,7 @@ class FlatOctree:
                     pi = self.leaf_indices[ls + k]
                     if pi >= 0:
                         r_i = self.particle_radii[pi]
-                        r3 = r_i ** 3
+                        r3 = r_i**3
                         pos = self.particle_positions[pi]
                         r3_sum += r3
                         wcx += pos[0] * r3
@@ -566,16 +571,25 @@ class FlatOctree:
             self.nodes.fmom_zy[idx] = 0.0
             self.nodes.fmom_zz[idx] = 0.0
 
-            if (self.nodes.is_leaf(idx) and self.nodes.count[idx] > 0
-                    and self.nodes.leaf_start[idx] >= 0):
+            if (
+                self.nodes.is_leaf(idx)
+                and self.nodes.count[idx] > 0
+                and self.nodes.leaf_start[idx] >= 0
+            ):
                 ls = self.nodes.leaf_start[idx]
                 cnt = self.nodes.count[idx]
                 fsx = ti.f64(0.0)
                 fsy = ti.f64(0.0)
                 fsz = ti.f64(0.0)
-                pxx = ti.f64(0.0); pxy = ti.f64(0.0); pxz = ti.f64(0.0)
-                pyx = ti.f64(0.0); pyy = ti.f64(0.0); pyz = ti.f64(0.0)
-                pzx = ti.f64(0.0); pzy = ti.f64(0.0); pzz = ti.f64(0.0)
+                pxx = ti.f64(0.0)
+                pxy = ti.f64(0.0)
+                pxz = ti.f64(0.0)
+                pyx = ti.f64(0.0)
+                pyy = ti.f64(0.0)
+                pyz = ti.f64(0.0)
+                pzx = ti.f64(0.0)
+                pzy = ti.f64(0.0)
+                pzz = ti.f64(0.0)
                 for k in range(cnt):
                     pi = self.leaf_indices[ls + k]
                     if pi >= 0:
@@ -589,16 +603,26 @@ class FlatOctree:
                         rx = self.particle_positions[pi][0]
                         ry = self.particle_positions[pi][1]
                         rz = self.particle_positions[pi][2]
-                        pxx += rx * fx; pxy += rx * fy; pxz += rx * fz
-                        pyx += ry * fx; pyy += ry * fy; pyz += ry * fz
-                        pzx += rz * fx; pzy += rz * fy; pzz += rz * fz
+                        pxx += rx * fx
+                        pxy += rx * fy
+                        pxz += rx * fz
+                        pyx += ry * fx
+                        pyy += ry * fy
+                        pyz += ry * fz
+                        pzx += rz * fx
+                        pzy += rz * fy
+                        pzz += rz * fz
                 self.nodes.force_sum_x[idx] = fsx
                 self.nodes.force_sum_y[idx] = fsy
                 self.nodes.force_sum_z[idx] = fsz
-                self.nodes.fmom_xx[idx] = pxx; self.nodes.fmom_xy[idx] = pxy
-                self.nodes.fmom_xz[idx] = pxz; self.nodes.fmom_yx[idx] = pyx
-                self.nodes.fmom_yy[idx] = pyy; self.nodes.fmom_yz[idx] = pyz
-                self.nodes.fmom_zx[idx] = pzx; self.nodes.fmom_zy[idx] = pzy
+                self.nodes.fmom_xx[idx] = pxx
+                self.nodes.fmom_xy[idx] = pxy
+                self.nodes.fmom_xz[idx] = pxz
+                self.nodes.fmom_yx[idx] = pyx
+                self.nodes.fmom_yy[idx] = pyy
+                self.nodes.fmom_yz[idx] = pyz
+                self.nodes.fmom_zx[idx] = pzx
+                self.nodes.fmom_zy[idx] = pzy
                 self.nodes.fmom_zz[idx] = pzz
 
     @ti.kernel
@@ -610,9 +634,15 @@ class FlatOctree:
             fsx = ti.f64(0.0)
             fsy = ti.f64(0.0)
             fsz = ti.f64(0.0)
-            pxx = ti.f64(0.0); pxy = ti.f64(0.0); pxz = ti.f64(0.0)
-            pyx = ti.f64(0.0); pyy = ti.f64(0.0); pyz = ti.f64(0.0)
-            pzx = ti.f64(0.0); pzy = ti.f64(0.0); pzz = ti.f64(0.0)
+            pxx = ti.f64(0.0)
+            pxy = ti.f64(0.0)
+            pxz = ti.f64(0.0)
+            pyx = ti.f64(0.0)
+            pyy = ti.f64(0.0)
+            pyz = ti.f64(0.0)
+            pzx = ti.f64(0.0)
+            pzy = ti.f64(0.0)
+            pzz = ti.f64(0.0)
             for j in range(8):
                 child_idx = base + j
                 if self.nodes.count[child_idx] > 0:
@@ -631,10 +661,14 @@ class FlatOctree:
             self.nodes.force_sum_x[parent_idx] = fsx
             self.nodes.force_sum_y[parent_idx] = fsy
             self.nodes.force_sum_z[parent_idx] = fsz
-            self.nodes.fmom_xx[parent_idx] = pxx; self.nodes.fmom_xy[parent_idx] = pxy
-            self.nodes.fmom_xz[parent_idx] = pxz; self.nodes.fmom_yx[parent_idx] = pyx
-            self.nodes.fmom_yy[parent_idx] = pyy; self.nodes.fmom_yz[parent_idx] = pyz
-            self.nodes.fmom_zx[parent_idx] = pzx; self.nodes.fmom_zy[parent_idx] = pzy
+            self.nodes.fmom_xx[parent_idx] = pxx
+            self.nodes.fmom_xy[parent_idx] = pxy
+            self.nodes.fmom_xz[parent_idx] = pxz
+            self.nodes.fmom_yx[parent_idx] = pyx
+            self.nodes.fmom_yy[parent_idx] = pyy
+            self.nodes.fmom_yz[parent_idx] = pyz
+            self.nodes.fmom_zx[parent_idx] = pzx
+            self.nodes.fmom_zy[parent_idx] = pzy
             self.nodes.fmom_zz[parent_idx] = pzz
 
     def _sweep_bottom_up(self):
@@ -677,16 +711,25 @@ class FlatOctree:
             self.nodes.fmom_zy[idx] = 0.0
             self.nodes.fmom_zz[idx] = 0.0
 
-            if (self.nodes.is_leaf(idx) and self.nodes.count[idx] > 0
-                    and self.nodes.leaf_start[idx] >= 0):
+            if (
+                self.nodes.is_leaf(idx)
+                and self.nodes.count[idx] > 0
+                and self.nodes.leaf_start[idx] >= 0
+            ):
                 ls = self.nodes.leaf_start[idx]
                 cnt = self.nodes.count[idx]
                 fsx = ti.f64(0.0)
                 fsy = ti.f64(0.0)
                 fsz = ti.f64(0.0)
-                pxx = ti.f64(0.0); pxy = ti.f64(0.0); pxz = ti.f64(0.0)
-                pyx = ti.f64(0.0); pyy = ti.f64(0.0); pyz = ti.f64(0.0)
-                pzx = ti.f64(0.0); pzy = ti.f64(0.0); pzz = ti.f64(0.0)
+                pxx = ti.f64(0.0)
+                pxy = ti.f64(0.0)
+                pxz = ti.f64(0.0)
+                pyx = ti.f64(0.0)
+                pyy = ti.f64(0.0)
+                pyz = ti.f64(0.0)
+                pzx = ti.f64(0.0)
+                pzy = ti.f64(0.0)
+                pzz = ti.f64(0.0)
                 for k in range(cnt):
                     pi = self.leaf_indices[ls + k]
                     if pi >= 0:
@@ -700,16 +743,26 @@ class FlatOctree:
                         rx = self.particle_positions[pi][0]
                         ry = self.particle_positions[pi][1]
                         rz = self.particle_positions[pi][2]
-                        pxx += rx * fx; pxy += rx * fy; pxz += rx * fz
-                        pyx += ry * fx; pyy += ry * fy; pyz += ry * fz
-                        pzx += rz * fx; pzy += rz * fy; pzz += rz * fz
+                        pxx += rx * fx
+                        pxy += rx * fy
+                        pxz += rx * fz
+                        pyx += ry * fx
+                        pyy += ry * fy
+                        pyz += ry * fz
+                        pzx += rz * fx
+                        pzy += rz * fy
+                        pzz += rz * fz
                 self.nodes.force_sum_x[idx] = fsx
                 self.nodes.force_sum_y[idx] = fsy
                 self.nodes.force_sum_z[idx] = fsz
-                self.nodes.fmom_xx[idx] = pxx; self.nodes.fmom_xy[idx] = pxy
-                self.nodes.fmom_xz[idx] = pxz; self.nodes.fmom_yx[idx] = pyx
-                self.nodes.fmom_yy[idx] = pyy; self.nodes.fmom_yz[idx] = pyz
-                self.nodes.fmom_zx[idx] = pzx; self.nodes.fmom_zy[idx] = pzy
+                self.nodes.fmom_xx[idx] = pxx
+                self.nodes.fmom_xy[idx] = pxy
+                self.nodes.fmom_xz[idx] = pxz
+                self.nodes.fmom_yx[idx] = pyx
+                self.nodes.fmom_yy[idx] = pyy
+                self.nodes.fmom_yz[idx] = pyz
+                self.nodes.fmom_zx[idx] = pzx
+                self.nodes.fmom_zy[idx] = pzy
                 self.nodes.fmom_zz[idx] = pzz
 
     def _propagate_forces_from_fields(self):
@@ -728,11 +781,13 @@ class FlatOctree:
     # =================================================================
 
     @ti.kernel
-    def _compute_forces_kernel(self,
-                               fx: ti.types.ndarray(),
-                               fy: ti.types.ndarray(),
-                               fz: ti.types.ndarray(),
-                               m_const: ti.f64):
+    def _compute_forces_kernel(
+        self,
+        fx: ti.types.ndarray(),
+        fy: ti.types.ndarray(),
+        fz: ti.types.ndarray(),
+        m_const: ti.f64,
+    ):
         n = self.num_particles[None]
         theta_sq = self.theta_sq[None]
         r3_threshold = _R3_SKIP_THRESHOLD  # Исправление #6: именованная константа
@@ -856,8 +911,15 @@ class FlatOctree:
 
     @staticmethod
     @ti.func
-    def _trilinear_interp(grid: ti.template(), x: ti.f64, y: ti.f64, z: ti.f64,
-                          grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32) -> ti.f64:
+    def _trilinear_interp(
+        grid: ti.template(),
+        x: ti.f64,
+        y: ti.f64,
+        z: ti.f64,
+        grid_min: ti.f64,
+        inv_dx: ti.f64,
+        n: ti.i32,
+    ) -> ti.f64:
         """Трилинейная интерполяция на регулярной 3D сетке с clamping."""
         fx = (x - grid_min) * inv_dx
         fy = (y - grid_min) * inv_dx
@@ -880,19 +942,22 @@ class FlatOctree:
         c101 = grid[ix + 1, iy, iz + 1]
         c110 = grid[ix + 1, iy + 1, iz]
         c111 = grid[ix + 1, iy + 1, iz + 1]
-        return (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
-                c001 * (1 - tx) * (1 - ty) * tz +
-                c010 * (1 - tx) * ty * (1 - tz) +
-                c011 * (1 - tx) * ty * tz +
-                c100 * tx * (1 - ty) * (1 - tz) +
-                c101 * tx * (1 - ty) * tz +
-                c110 * tx * ty * (1 - tz) +
-                c111 * tx * ty * tz)
+        return (
+            c000 * (1 - tx) * (1 - ty) * (1 - tz)
+            + c001 * (1 - tx) * (1 - ty) * tz
+            + c010 * (1 - tx) * ty * (1 - tz)
+            + c011 * (1 - tx) * ty * tz
+            + c100 * tx * (1 - ty) * (1 - tz)
+            + c101 * tx * (1 - ty) * tz
+            + c110 * tx * ty * (1 - tz)
+            + c111 * tx * ty * tz
+        )
 
     @staticmethod
     @ti.func
-    def _precompute_grid_idx(x: ti.f64, y: ti.f64, z: ti.f64,
-                             grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32):
+    def _precompute_grid_idx(
+        x: ti.f64, y: ti.f64, z: ti.f64, grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32
+    ):
         fx = (x - grid_min) * inv_dx
         fy = (y - grid_min) * inv_dx
         fz = (z - grid_min) * inv_dx
@@ -910,9 +975,9 @@ class FlatOctree:
 
     @staticmethod
     @ti.func
-    def _interp_precomp(grid: ti.template(),
-                        ix: ti.i32, iy: ti.i32, iz: ti.i32,
-                        tx: ti.f64, ty: ti.f64, tz: ti.f64) -> ti.f64:
+    def _interp_precomp(
+        grid: ti.template(), ix: ti.i32, iy: ti.i32, iz: ti.i32, tx: ti.f64, ty: ti.f64, tz: ti.f64
+    ) -> ti.f64:
         c000 = grid[ix, iy, iz]
         c001 = grid[ix, iy, iz + 1]
         c010 = grid[ix, iy + 1, iz]
@@ -921,22 +986,26 @@ class FlatOctree:
         c101 = grid[ix + 1, iy, iz + 1]
         c110 = grid[ix + 1, iy + 1, iz]
         c111 = grid[ix + 1, iy + 1, iz + 1]
-        return (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
-                c001 * (1 - tx) * (1 - ty) * tz +
-                c010 * (1 - tx) * ty * (1 - tz) +
-                c011 * (1 - tx) * ty * tz +
-                c100 * tx * (1 - ty) * (1 - tz) +
-                c101 * tx * (1 - ty) * tz +
-                c110 * tx * ty * (1 - tz) +
-                c111 * tx * ty * tz)
+        return (
+            c000 * (1 - tx) * (1 - ty) * (1 - tz)
+            + c001 * (1 - tx) * (1 - ty) * tz
+            + c010 * (1 - tx) * ty * (1 - tz)
+            + c011 * (1 - tx) * ty * tz
+            + c100 * tx * (1 - ty) * (1 - tz)
+            + c101 * tx * (1 - ty) * tz
+            + c110 * tx * ty * (1 - tz)
+            + c111 * tx * ty * tz
+        )
 
     @ti.kernel
-    def _compute_stokeslet_kernel(self,
-                                  forces_np: ti.types.ndarray(),
-                                  vx: ti.types.ndarray(),
-                                  vy: ti.types.ndarray(),
-                                  vz: ti.types.ndarray(),
-                                  eta_const: ti.f64):
+    def _compute_stokeslet_kernel(
+        self,
+        forces_np: ti.types.ndarray(),
+        vx: ti.types.ndarray(),
+        vy: ti.types.ndarray(),
+        vz: ti.types.ndarray(),
+        eta_const: ti.f64,
+    ):
         n = self.num_particles[None]
         theta_sq = self.theta_sq[None]
         fsq_threshold = _FORCE_SQ_SKIP_THRESHOLD  # Исправление #6: именованная константа
@@ -950,9 +1019,11 @@ class FlatOctree:
             node_idx = 0
             while node_idx >= 0:
                 cnt = self.nodes.count[node_idx]
-                fs2 = (self.nodes.force_sum_x[node_idx] ** 2 +
-                       self.nodes.force_sum_y[node_idx] ** 2 +
-                       self.nodes.force_sum_z[node_idx] ** 2)
+                fs2 = (
+                    self.nodes.force_sum_x[node_idx] ** 2
+                    + self.nodes.force_sum_y[node_idx] ** 2
+                    + self.nodes.force_sum_z[node_idx] ** 2
+                )
                 if cnt == 0 or fs2 < fsq_threshold:
                     node_idx = self.nodes.next[node_idx]
                     continue
@@ -1009,22 +1080,46 @@ class FlatOctree:
                                     eta_r = self.corr_eta_ratio[None]
 
                                     # G_z: (xc, yc, zc) — предвычисление индексов один раз
-                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
-                                    gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
-                                    gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
-                                    gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(
+                                        xc, yc, zc, gmin, ginv, gn
+                                    )
+                                    gz_x = self._interp_precomp(
+                                        self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
+                                    gz_y = self._interp_precomp(
+                                        self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
+                                    gz_z = self._interp_precomp(
+                                        self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
 
                                     # G_x: перестановка x↔z → (zc, yc, xc)
-                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
-                                    gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
-                                    gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
-                                    gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(
+                                        zc, yc, xc, gmin, ginv, gn
+                                    )
+                                    gx_x = self._interp_precomp(
+                                        self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
+                                    gx_y = self._interp_precomp(
+                                        self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
+                                    gx_z = self._interp_precomp(
+                                        self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
 
                                     # G_y: перестановка y↔z → (xc, zc, yc)
-                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
-                                    gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
-                                    gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
-                                    gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(
+                                        xc, zc, yc, gmin, ginv, gn
+                                    )
+                                    gy_x = self._interp_precomp(
+                                        self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
+                                    gy_y = self._interp_precomp(
+                                        self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
+                                    gy_z = self._interp_precomp(
+                                        self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
 
                                     common = Fz_inv * eta_r * cL
                                     sx = Fx * common
@@ -1085,19 +1180,25 @@ class FlatOctree:
                         eta_r = self.corr_eta_ratio[None]
 
                         # G_z: (xc, yc, zc) — предвычисление индексов один раз
-                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(
+                            xc, yc, zc, gmin, ginv, gn
+                        )
                         gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
                         # G_x: перестановка x↔z → (zc, yc, xc)
-                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(
+                            zc, yc, xc, gmin, ginv, gn
+                        )
                         gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
                         # G_y: перестановка y↔z → (xc, zc, yc)
-                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(
+                            xc, zc, yc, gmin, ginv, gn
+                        )
                         gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
@@ -1138,7 +1239,9 @@ class FlatOctree:
                     Dzy = self.nodes.fmom_zy[node_idx] - cmz * Fy
                     Dzz = self.nodes.fmom_zz[node_idx] - cmz * Fz
 
-                    rx = dx; ry = dy; rz = dz
+                    rx = dx
+                    ry = dy
+                    rz = dz
 
                     # u = D^T · R (транспонированный дипольный тензор на вектор)
                     ux = Dxx * rx + Dyx * ry + Dzx * rz
@@ -1221,13 +1324,15 @@ class FlatOctree:
         return forces, velocities
 
     @ti.kernel
-    def _compute_total_velocity_kernel(self,
-                                       forces_np: ti.types.ndarray(),
-                                       vx: ti.types.ndarray(),
-                                       vy: ti.types.ndarray(),
-                                       vz: ti.types.ndarray(),
-                                       eta_const: ti.f64,
-                                       stokes_factor: ti.f64):
+    def _compute_total_velocity_kernel(
+        self,
+        forces_np: ti.types.ndarray(),
+        vx: ti.types.ndarray(),
+        vy: ti.types.ndarray(),
+        vz: ti.types.ndarray(),
+        eta_const: ti.f64,
+        stokes_factor: ti.f64,
+    ):
         """Объединённое ядро: v_total = v_migration + v_convection за один обход."""
         n = self.num_particles[None]
         theta_sq = self.theta_sq[None]
@@ -1244,9 +1349,11 @@ class FlatOctree:
             node_idx = 0
             while node_idx >= 0:
                 cnt = self.nodes.count[node_idx]
-                fs2 = (self.nodes.force_sum_x[node_idx] ** 2 +
-                       self.nodes.force_sum_y[node_idx] ** 2 +
-                       self.nodes.force_sum_z[node_idx] ** 2)
+                fs2 = (
+                    self.nodes.force_sum_x[node_idx] ** 2
+                    + self.nodes.force_sum_y[node_idx] ** 2
+                    + self.nodes.force_sum_z[node_idx] ** 2
+                )
                 if cnt == 0 or fs2 < fsq_threshold:
                     node_idx = self.nodes.next[node_idx]
                     continue
@@ -1301,20 +1408,44 @@ class FlatOctree:
                                     Fz_inv = self.corr_Fz_inv[None]
                                     eta_r = self.corr_eta_ratio[None]
 
-                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
-                                    gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
-                                    gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
-                                    gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
+                                    i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(
+                                        xc, yc, zc, gmin, ginv, gn
+                                    )
+                                    gz_x = self._interp_precomp(
+                                        self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
+                                    gz_y = self._interp_precomp(
+                                        self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
+                                    gz_z = self._interp_precomp(
+                                        self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z
+                                    )
 
-                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
-                                    gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
-                                    gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
-                                    gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
+                                    i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(
+                                        zc, yc, xc, gmin, ginv, gn
+                                    )
+                                    gx_x = self._interp_precomp(
+                                        self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
+                                    gx_y = self._interp_precomp(
+                                        self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
+                                    gx_z = self._interp_precomp(
+                                        self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z
+                                    )
 
-                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
-                                    gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
-                                    gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
-                                    gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
+                                    i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(
+                                        xc, zc, yc, gmin, ginv, gn
+                                    )
+                                    gy_x = self._interp_precomp(
+                                        self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
+                                    gy_y = self._interp_precomp(
+                                        self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
+                                    gy_z = self._interp_precomp(
+                                        self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z
+                                    )
 
                                     common = Fz_inv * eta_r * cL
                                     sx = Fx * common
@@ -1371,17 +1502,23 @@ class FlatOctree:
                         Fz_inv = self.corr_Fz_inv[None]
                         eta_r = self.corr_eta_ratio[None]
 
-                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(
+                            xc, yc, zc, gmin, ginv, gn
+                        )
                         gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
-                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(
+                            zc, yc, xc, gmin, ginv, gn
+                        )
                         gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
-                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(
+                            xc, zc, yc, gmin, ginv, gn
+                        )
                         gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
@@ -1420,7 +1557,9 @@ class FlatOctree:
                     Dzy = self.nodes.fmom_zy[node_idx] - cmz * Fy
                     Dzz = self.nodes.fmom_zz[node_idx] - cmz * Fz
 
-                    rx = dx; ry = dy; rz = dz
+                    rx = dx
+                    ry = dy
+                    rz = dz
 
                     ux = Dxx * rx + Dyx * ry + Dzx * rz
                     uy = Dxy * rx + Dyy * ry + Dzy * rz
@@ -1448,8 +1587,9 @@ class FlatOctree:
             vy[i] = v_y
             vz[i] = v_z
 
-    def compute_total_velocity(self, forces: np.ndarray, eta_const: float,
-                               stokes_factor: float) -> np.ndarray:
+    def compute_total_velocity(
+        self, forces: np.ndarray, eta_const: float, stokes_factor: float
+    ) -> np.ndarray:
         """Вычисление полной скорости (миграция + конвекция) за один обход дерева."""
         n = self.num_particles[None]
         forces_c = np.ascontiguousarray(forces[:n], dtype=np.float64)
@@ -1463,8 +1603,9 @@ class FlatOctree:
         self._compute_total_velocity_kernel(forces_c, vx, vy, vz, eta_const, stokes_factor)
         return np.stack([vx, vy, vz], axis=1)
 
-    def compute_forces_and_total_velocity(self, m_const: float, eta_const: float,
-                                          stokes_factor: float) -> tuple:
+    def compute_forces_and_total_velocity(
+        self, m_const: float, eta_const: float, stokes_factor: float
+    ) -> tuple:
         """Расчёт сил + полной скорости за минимальное число обходов."""
         forces = self.compute_forces(m_const)
         total_velocity = self.compute_total_velocity(forces, eta_const, stokes_factor)
@@ -1480,10 +1621,10 @@ class FlatOctree:
         pc = self.parent_count[None]
         np_ = self.num_particles[None]
         return {
-            'node_count': nc,
-            'max_nodes': self.max_nodes,
-            'node_utilization': nc / self.max_nodes if self.max_nodes > 0 else 0.0,
-            'parent_count': pc,
-            'num_particles': np_,
-            'leaf_slot_count': self.leaf_slot_count[None],
+            "node_count": nc,
+            "max_nodes": self.max_nodes,
+            "node_utilization": nc / self.max_nodes if self.max_nodes > 0 else 0.0,
+            "parent_count": pc,
+            "num_particles": np_,
+            "leaf_slot_count": self.leaf_slot_count[None],
         }

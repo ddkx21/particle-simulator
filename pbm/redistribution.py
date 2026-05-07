@@ -67,7 +67,7 @@ def cell_average(
     a_bar = np.zeros(n)
     a_bar[valid] = M[valid] / B[valid]
 
-    left = valid & (a_bar < x)   # средний объём ниже центра
+    left = valid & (a_bar < x)  # средний объём ниже центра
     right = valid & ~(a_bar < x)  # средний объём выше или равен центру
 
     # ----- left случай: a_bar < x[i] -----

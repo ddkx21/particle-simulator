@@ -100,21 +100,31 @@ class OctreeNode:
         result = ti.Vector([0.0, 0.0, 0.0], dt=ti.f64)
         if self.R3_sum[idx] > 0.0:
             inv = 1.0 / self.R3_sum[idx]
-            result = ti.Vector([self.R3_cx[idx] * inv,
-                                self.R3_cy[idx] * inv,
-                                self.R3_cz[idx] * inv])
+            result = ti.Vector(
+                [self.R3_cx[idx] * inv, self.R3_cy[idx] * inv, self.R3_cz[idx] * inv]
+            )
         else:
-            result = ti.Vector([
-                (self.min_x[idx] + self.max_x[idx]) * 0.5,
-                (self.min_y[idx] + self.max_y[idx]) * 0.5,
-                (self.min_z[idx] + self.max_z[idx]) * 0.5])
+            result = ti.Vector(
+                [
+                    (self.min_x[idx] + self.max_x[idx]) * 0.5,
+                    (self.min_y[idx] + self.max_y[idx]) * 0.5,
+                    (self.min_z[idx] + self.max_z[idx]) * 0.5,
+                ]
+            )
         return result
 
     @ti.func
-    def init_node(self, idx: ti.i32,
-                  min_x: ti.f64, min_y: ti.f64, min_z: ti.f64,
-                  max_x: ti.f64, max_y: ti.f64, max_z: ti.f64,
-                  next_idx: ti.i32):
+    def init_node(
+        self,
+        idx: ti.i32,
+        min_x: ti.f64,
+        min_y: ti.f64,
+        min_z: ti.f64,
+        max_x: ti.f64,
+        max_y: ti.f64,
+        max_z: ti.f64,
+        next_idx: ti.i32,
+    ):
         self.min_x[idx] = min_x
         self.min_y[idx] = min_y
         self.min_z[idx] = min_z

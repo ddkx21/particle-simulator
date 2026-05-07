@@ -1,10 +1,11 @@
 """Тесты pbm/redistribution.py — fixed_pivot и cell_average."""
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from pbm import VolumeGrid, fixed_pivot, cell_average
+from pbm import VolumeGrid, cell_average, fixed_pivot
 
 
 # --------------------------------------------------------------------------

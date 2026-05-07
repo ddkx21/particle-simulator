@@ -13,6 +13,7 @@ import taichi as ti
 from ..force_calculator.force_calculator_base import ForceCalculator
 from .flat_tree import FlatOctree
 
+
 @ti.data_oriented
 class TreeDropletForceCalculator(ForceCalculator):
     """
@@ -26,17 +27,19 @@ class TreeDropletForceCalculator(ForceCalculator):
     - periodic: периодические граничные условия
     """
 
-    def __init__(self,
-                 num_particles: int = 10000,
-                 theta: float = 0.5,
-                 mpl: int = 1,
-                 eps_oil: float = 2.85,
-                 eta_oil: float = 0.065,
-                 eta_water: float = 0.001,
-                 E: float = 3e5,
-                 L: float = 1.0,
-                 periodic: bool = False,
-                 correction_grid_resolution: int = 0):
+    def __init__(
+        self,
+        num_particles: int = 10000,
+        theta: float = 0.5,
+        mpl: int = 1,
+        eps_oil: float = 2.85,
+        eta_oil: float = 0.065,
+        eta_water: float = 0.001,
+        E: float = 3e5,
+        L: float = 1.0,
+        periodic: bool = False,
+        correction_grid_resolution: int = 0,
+    ):
 
         self.eps0 = 8.85418781762039e-12
         self.eps_oil = eps_oil
@@ -58,9 +61,12 @@ class TreeDropletForceCalculator(ForceCalculator):
         self.mpl = mpl
         self.correction_grid_resolution = correction_grid_resolution
 
-        self.octree = FlatOctree(theta=theta, mpl=mpl,
-                                 num_particles=num_particles,
-                                 correction_grid_resolution=correction_grid_resolution)
+        self.octree = FlatOctree(
+            theta=theta,
+            mpl=mpl,
+            num_particles=num_particles,
+            correction_grid_resolution=correction_grid_resolution,
+        )
 
         # Флаг устаревшего дерева — дерево перестраивается перед каждым использованием
         self._tree_is_stale = True
@@ -86,13 +92,18 @@ class TreeDropletForceCalculator(ForceCalculator):
     def _ensure_octree_capacity(self, n: int) -> None:
         """Пересоздание октодерева, если число частиц превышает выделенную ёмкость."""
         if n > self.num_particles:
-            self.octree = FlatOctree(theta=self.theta, mpl=self.mpl,
-                                     num_particles=n,
-                                     correction_grid_resolution=self.correction_grid_resolution)
+            self.octree = FlatOctree(
+                theta=self.theta,
+                mpl=self.mpl,
+                num_particles=n,
+                correction_grid_resolution=self.correction_grid_resolution,
+            )
             self.num_particles = n
             # Перезагрузка поправки в новое дерево
             if self._correction is not None:
-                self.octree.load_periodic_correction(self._correction, self._correction_L_sim, eta_sim=self.eta_oil)
+                self.octree.load_periodic_correction(
+                    self._correction, self._correction_L_sim, eta_sim=self.eta_oil
+                )
 
     def load_periodic_correction(self, correction, L_sim: float):
         """Загрузка данных периодической поправки COMSOL."""
@@ -100,13 +111,14 @@ class TreeDropletForceCalculator(ForceCalculator):
         self._correction_L_sim = L_sim
         self.octree.load_periodic_correction(correction, L_sim, eta_sim=self.eta_oil)
 
-    def calculate(self,
-                  positions: np.ndarray,   # форма (N, 3), float64
-                  radii: np.ndarray,       # форма (N,), float64
-                  *,
-                  L: float | None = None,
-                  periodic: bool | None = None,
-                  ) -> np.ndarray:         # форма (N, 3), float64
+    def calculate(
+        self,
+        positions: np.ndarray,  # форма (N, 3), float64
+        radii: np.ndarray,  # форма (N,), float64
+        *,
+        L: float | None = None,
+        periodic: bool | None = None,
+    ) -> np.ndarray:  # форма (N, 3), float64
         """
         Вычислить дипольные силы через октодерево.
 
@@ -128,14 +140,15 @@ class TreeDropletForceCalculator(ForceCalculator):
 
         return forces
 
-    def calculate_convection(self,
-                             positions: np.ndarray,   # форма (N, 3), float64
-                             radii: np.ndarray,       # форма (N,), float64
-                             forces: np.ndarray,      # форма (N, 3), float64
-                             *,
-                             L: float | None = None,
-                             periodic: bool | None = None,
-                             ) -> np.ndarray:         # форма (N, 3), float64
+    def calculate_convection(
+        self,
+        positions: np.ndarray,  # форма (N, 3), float64
+        radii: np.ndarray,  # форма (N,), float64
+        forces: np.ndarray,  # форма (N, 3), float64
+        *,
+        L: float | None = None,
+        periodic: bool | None = None,
+    ) -> np.ndarray:  # форма (N, 3), float64
         """
         Вычислить Стокслет-скорости (конвекцию) через октодерево.
         Дерево перестраивается если помечено как устаревшее.
@@ -168,13 +181,14 @@ class TreeDropletForceCalculator(ForceCalculator):
 
         return velocities
 
-    def calculate_forces_and_convection(self,
-                                        positions: np.ndarray,
-                                        radii: np.ndarray,
-                                        *,
-                                        L: float | None = None,
-                                        periodic: bool | None = None,
-                                        ) -> tuple:
+    def calculate_forces_and_convection(
+        self,
+        positions: np.ndarray,
+        radii: np.ndarray,
+        *,
+        L: float | None = None,
+        periodic: bool | None = None,
+    ) -> tuple:
         """
         Вычислить силы и конвекцию в одном вызове.
 
@@ -194,20 +208,19 @@ class TreeDropletForceCalculator(ForceCalculator):
         self.octree.build(positions, radii, use_L, use_periodic)
         self._tree_is_stale = True
 
-        forces, velocities = self.octree.compute_forces_and_stokeslet(
-            self.m_const, self.eta_const
-        )
+        forces, velocities = self.octree.compute_forces_and_stokeslet(self.m_const, self.eta_const)
 
         return forces, velocities
 
-    def calculate_forces_and_total_velocity(self,
-                                            positions: np.ndarray,
-                                            radii: np.ndarray,
-                                            stokes_factor: float,
-                                            *,
-                                            L: float | None = None,
-                                            periodic: bool | None = None,
-                                            ) -> tuple:
+    def calculate_forces_and_total_velocity(
+        self,
+        positions: np.ndarray,
+        radii: np.ndarray,
+        stokes_factor: float,
+        *,
+        L: float | None = None,
+        periodic: bool | None = None,
+    ) -> tuple:
         """
         Вычислить силы и полную скорость (миграция + конвекция) за один проход.
 

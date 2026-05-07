@@ -1,4 +1,5 @@
 """Тесты pbm/kernels/analytical_kernel.py — AnalyticalElectrostaticKernel."""
+
 from __future__ import annotations
 
 import numpy as np

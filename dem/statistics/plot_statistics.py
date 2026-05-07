@@ -15,8 +15,9 @@ import argparse
 import os
 import re
 
-import numpy as np
 import matplotlib
+import numpy as np
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
@@ -92,8 +93,7 @@ def plot_droplet_count(datasets: list[tuple[str, dict, str]]) -> None:
 
     for label, data, color in datasets:
         for i in range(data["num_runs"]):
-            ax.plot(t_arr, data["droplet_counts"][i],
-                    color=color, alpha=0.1, linewidth=0.5)
+            ax.plot(t_arr, data["droplet_counts"][i], color=color, alpha=0.1, linewidth=0.5)
 
         mean = data["droplet_counts"].mean(axis=0)
         std = data["droplet_counts"].std(axis=0)
@@ -123,8 +123,7 @@ def plot_median_radius(datasets: list[tuple[str, dict, str]]) -> None:
 
     for label, data, color in datasets:
         for i in range(data["num_runs"]):
-            ax.plot(t_arr, data["median_radii"][i] * 1e6,
-                    color=color, alpha=0.1, linewidth=0.5)
+            ax.plot(t_arr, data["median_radii"][i] * 1e6, color=color, alpha=0.1, linewidth=0.5)
 
         mean = data["median_radii"].mean(axis=0) * 1e6
         std = data["median_radii"].std(axis=0) * 1e6
@@ -154,7 +153,7 @@ def plot_timing(datasets: list[tuple[str, dict, str]]) -> None:
     fig, ax = plt.subplots(figsize=(7, 5))
     bp = ax.boxplot(times_list, tick_labels=labels, patch_artist=True)
 
-    for box, color in zip(bp["boxes"], colors):
+    for box, color in zip(bp["boxes"], colors, strict=False):
         box.set_facecolor(color)
         box.set_alpha(0.5)
 
@@ -171,8 +170,10 @@ def plot_timing(datasets: list[tuple[str, dict, str]]) -> None:
 
     for label, data, _ in datasets:
         t = data["elapsed_times"]
-        print(f"\n{label}: {t.mean():.1f} ± {t.std():.1f} сек  "
-              f"(min={t.min():.1f}, max={t.max():.1f})")
+        print(
+            f"\n{label}: {t.mean():.1f} ± {t.std():.1f} сек  "
+            f"(min={t.min():.1f}, max={t.max():.1f})"
+        )
 
     if len(datasets) == 2:
         t0 = datasets[0][1]["elapsed_times"].mean()
@@ -185,9 +186,7 @@ def _compute_averaged_histograms(
     radii_list: list[np.ndarray], bins: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     """Усреднённые гистограммы по реализациям."""
-    hists = np.array([
-        np.histogram(r, bins=bins, density=True)[0] for r in radii_list
-    ])
+    hists = np.array([np.histogram(r, bins=bins, density=True)[0] for r in radii_list])
     return hists.mean(axis=0), hists.std(axis=0)
 
 
@@ -199,8 +198,7 @@ def plot_radii_distribution(datasets: list[tuple[str, dict, str]]) -> None:
     n = len(histogram_times)
     ncols = min(n, 3)
     nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4.5 * nrows),
-                             squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4.5 * nrows), squeeze=False)
     axes_flat = axes.flatten()
 
     for idx, t in enumerate(histogram_times):
@@ -219,8 +217,7 @@ def plot_radii_distribution(datasets: list[tuple[str, dict, str]]) -> None:
             radii = [r * 1e6 for r in data["radii_by_time"][t]]
             mean, std = _compute_averaged_histograms(radii, bins)
             ax.plot(bin_centers, mean, color=color, linewidth=1.5, label=label)
-            ax.fill_between(bin_centers, mean - std, mean + std,
-                            color=color, alpha=0.2)
+            ax.fill_between(bin_centers, mean - std, mean + std, color=color, alpha=0.2)
 
         ax.set_title(f"t = {t} сек")
         ax.set_xlabel("Радиус, мкм")
@@ -241,9 +238,7 @@ def plot_radii_distribution(datasets: list[tuple[str, dict, str]]) -> None:
     print(f"Сохранён: {path}")
 
 
-def plot_radii_histograms_individual(
-    datasets: list[tuple[str, dict, str]]
-) -> None:
+def plot_radii_histograms_individual(datasets: list[tuple[str, dict, str]]) -> None:
     """Отдельные гистограммы для каждого histogram_time."""
     histogram_times = datasets[0][1]["histogram_times"]
     total_runs = _total_runs(datasets)
@@ -266,19 +261,37 @@ def plot_radii_histograms_individual(
             label, data, color = datasets[0]
             radii = [r * 1e6 for r in data["radii_by_time"][t]]
             mean, std = _compute_averaged_histograms(radii, bins)
-            ax.bar(bin_centers, mean, width=bin_width * 0.8,
-                   color=color, alpha=0.7, label=f"{label} (mean)")
-            ax.errorbar(bin_centers, mean, yerr=std,
-                        fmt="none", ecolor=color, alpha=0.5, capsize=2)
+            ax.bar(
+                bin_centers,
+                mean,
+                width=bin_width * 0.8,
+                color=color,
+                alpha=0.7,
+                label=f"{label} (mean)",
+            )
+            ax.errorbar(bin_centers, mean, yerr=std, fmt="none", ecolor=color, alpha=0.5, capsize=2)
         else:
             for i, (label, data, color) in enumerate(datasets):
                 offset = (i - 0.5) * bin_width * 0.4
                 radii = [r * 1e6 for r in data["radii_by_time"][t]]
                 mean, std = _compute_averaged_histograms(radii, bins)
-                ax.bar(bin_centers + offset, mean, width=bin_width * 0.4,
-                       color=color, alpha=0.7, label=f"{label} (mean)")
-                ax.errorbar(bin_centers + offset, mean, yerr=std,
-                            fmt="none", ecolor=color, alpha=0.5, capsize=2)
+                ax.bar(
+                    bin_centers + offset,
+                    mean,
+                    width=bin_width * 0.4,
+                    color=color,
+                    alpha=0.7,
+                    label=f"{label} (mean)",
+                )
+                ax.errorbar(
+                    bin_centers + offset,
+                    mean,
+                    yerr=std,
+                    fmt="none",
+                    ecolor=color,
+                    alpha=0.5,
+                    capsize=2,
+                )
 
         ax.set_xlabel("Радиус, мкм")
         ax.set_ylabel("Плотность")
@@ -293,9 +306,7 @@ def plot_radii_histograms_individual(
         print(f"Сохранён: {path}")
 
 
-def plot_radii_kde_individual(
-    datasets: list[tuple[str, dict, str]]
-) -> None:
+def plot_radii_kde_individual(datasets: list[tuple[str, dict, str]]) -> None:
     """Отдельные KDE-графики для каждого histogram_time."""
     histogram_times = datasets[0][1]["histogram_times"]
     total_runs = _total_runs(datasets)
@@ -322,13 +333,13 @@ def plot_radii_kde_individual(
                 kdes = np.array([gaussian_kde(r)(x_grid) for r in radii_um])
                 mean_kde = kdes.mean(axis=0)
                 std_kde = kdes.std(axis=0)
-                ax.fill_between(x_grid, mean_kde - std_kde, mean_kde + std_kde,
-                                color=color, alpha=0.15)
+                ax.fill_between(
+                    x_grid, mean_kde - std_kde, mean_kde + std_kde, color=color, alpha=0.15
+                )
 
         ax.set_xlabel("Радиус, мкм")
         ax.set_ylabel("Плотность")
-        ax.set_title(f"KDE распределения радиусов, t = {t} сек "
-                     f"({total_runs} реализаций)")
+        ax.set_title(f"KDE распределения радиусов, t = {t} сек " f"({total_runs} реализаций)")
         ax.legend()
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
@@ -353,27 +364,27 @@ def _build_datasets(
         path = os.path.join(RESULTS_DIR, filename)
         if not os.path.isfile(path):
             raise FileNotFoundError(
-                f"Файл не найден: {path}\n"
-                f"Сначала запустите: python statistics/run_{method}.py"
+                f"Файл не найден: {path}\n" f"Сначала запустите: python statistics/run_{method}.py"
             )
         data = load_data(filename)
         color = METHOD_COLORS[label]
         datasets.append((label, data, color))
-        print(f"{label}: {data['num_runs']} реализаций, "
-              f"histogram_times={data['histogram_times']}")
+        print(
+            f"{label}: {data['num_runs']} реализаций, " f"histogram_times={data['histogram_times']}"
+        )
     return datasets
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Построение графиков статистики симуляций."
-    )
+    parser = argparse.ArgumentParser(description="Построение графиков статистики симуляций.")
     parser.add_argument(
-        "--direct", action="store_true",
+        "--direct",
+        action="store_true",
         help="Включить данные direct-метода",
     )
     parser.add_argument(
-        "--tree", action="store_true",
+        "--tree",
+        action="store_true",
         help="Включить данные tree-метода",
     )
     args = parser.parse_args()
@@ -381,8 +392,10 @@ def main() -> None:
     # Если ни один флаг не указан — автодетект
     if not args.direct and not args.tree:
         methods = []
-        for method, filename in [("direct", "statistics_direct.npz"),
-                                 ("tree", "statistics_tree.npz")]:
+        for method, filename in [
+            ("direct", "statistics_direct.npz"),
+            ("tree", "statistics_tree.npz"),
+        ]:
             if os.path.isfile(os.path.join(RESULTS_DIR, filename)):
                 methods.append(method)
         if not methods:

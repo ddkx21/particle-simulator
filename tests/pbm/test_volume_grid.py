@@ -1,4 +1,5 @@
 """Тесты pbm/volume_grid.py — дискретизация объёмного пространства."""
+
 from __future__ import annotations
 
 import logging

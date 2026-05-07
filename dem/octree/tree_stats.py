@@ -171,14 +171,18 @@ def print_tree_stats(stats: TreeStatistics) -> None:
     print(f"  Tree depth:          {stats.tree_depth}")
     print(f"  Total nodes:         {stats.total_nodes} / {stats.max_nodes} ({pct:.1f}%)")
     print(f"    Internal:          {stats.internal_nodes}")
-    print(f"    Leaves:            {stats.total_leaves} "
-          f"(non-empty: {stats.non_empty_leaves}, empty: {stats.empty_leaves})")
+    print(
+        f"    Leaves:            {stats.total_leaves} "
+        f"(non-empty: {stats.non_empty_leaves}, empty: {stats.empty_leaves})"
+    )
     print(f"  Total particles:     {stats.total_particles}")
     print(f"  mpl:                 {stats.mpl}")
-    print(f"  Particles/leaf:      min={stats.min_particles_per_leaf}, "
-          f"max={stats.max_particles_per_leaf}, "
-          f"avg={stats.avg_particles_per_leaf:.1f}, "
-          f"median={stats.median_particles_per_leaf:.1f}")
+    print(
+        f"  Particles/leaf:      min={stats.min_particles_per_leaf}, "
+        f"max={stats.max_particles_per_leaf}, "
+        f"avg={stats.avg_particles_per_leaf:.1f}, "
+        f"median={stats.median_particles_per_leaf:.1f}"
+    )
 
     if stats.build_time_ms is not None:
         print(f"  Build time:          {stats.build_time_ms:.1f} ms")

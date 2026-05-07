@@ -6,8 +6,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import solve_ivp
 
-from pbm.volume_grid import VolumeGrid
 from pbm.redistribution import cell_average
+from pbm.volume_grid import VolumeGrid
 
 
 class PBMSolver:
@@ -44,11 +44,11 @@ class PBMSolver:
 
         # Предвычисляемые таблицы для векторизованного RHS
         self._pair_target_bin: NDArray[np.intp] | None = None  # (n²,) индекс bin для v_j+v_k
-        self._pair_v_new: NDArray[np.float64] | None = None    # (n²,) сами v_j+v_k
-        self._fp_left_bin: NDArray[np.intp] | None = None      # fixed_pivot: левый bin
-        self._fp_right_bin: NDArray[np.intp] | None = None     # fixed_pivot: правый bin
-        self._fp_w_left: NDArray[np.float64] | None = None     # fixed_pivot: вес левого
-        self._fp_w_right: NDArray[np.float64] | None = None    # fixed_pivot: вес правого
+        self._pair_v_new: NDArray[np.float64] | None = None  # (n²,) сами v_j+v_k
+        self._fp_left_bin: NDArray[np.intp] | None = None  # fixed_pivot: левый bin
+        self._fp_right_bin: NDArray[np.intp] | None = None  # fixed_pivot: правый bin
+        self._fp_w_left: NDArray[np.float64] | None = None  # fixed_pivot: вес левого
+        self._fp_w_right: NDArray[np.float64] | None = None  # fixed_pivot: вес правого
         self._precompute_tables()
 
     def _precompute_tables(self) -> None:

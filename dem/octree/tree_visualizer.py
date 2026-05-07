@@ -14,6 +14,7 @@ import numpy as np
 
 try:
     import pyvista as pv
+
     HAS_PYVISTA = True
 except ImportError:
     HAS_PYVISTA = False
@@ -28,7 +29,7 @@ def _build_wireframe_boxes(
     max_x: np.ndarray,
     max_y: np.ndarray,
     max_z: np.ndarray,
-) -> "pv.PolyData":
+) -> pv.PolyData:
     """Vectorized построение wireframe-боксов для N узлов.
 
     Returns:
@@ -40,27 +41,48 @@ def _build_wireframe_boxes(
 
     # 8 вершин на бокс: (x_bit, y_bit, z_bit) из {0,1}^3
     # Порядок: 000, 001, 010, 011, 100, 101, 110, 111
-    corner_bits = np.array([
-        [0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
-        [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1],
-    ], dtype=np.float64)  # (8, 3)
+    corner_bits = np.array(
+        [
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 0, 1],
+            [0, 1, 1],
+            [1, 1, 1],
+        ],
+        dtype=np.float64,
+    )  # (8, 3)
 
     lo = np.column_stack([min_x, min_y, min_z])  # (n, 3)
     hi = np.column_stack([max_x, max_y, max_z])  # (n, 3)
     extent = hi - lo  # (n, 3)
 
     # Для каждого бокса: pts[box*8+k] = lo[box] + corner_bits[k] * extent[box]
-    lo_rep = np.repeat(lo, 8, axis=0)       # (n*8, 3)
+    lo_rep = np.repeat(lo, 8, axis=0)  # (n*8, 3)
     ext_rep = np.repeat(extent, 8, axis=0)  # (n*8, 3)
     bits_tiled = np.tile(corner_bits, (n, 1))  # (n*8, 3)
     pts = lo_rep + bits_tiled * ext_rep
 
     # 12 рёбер на бокс
-    edges_local = np.array([
-        [0, 1], [2, 3], [4, 5], [6, 7],  # X-рёбра
-        [0, 2], [1, 3], [4, 6], [5, 7],  # Y-рёбра
-        [0, 4], [1, 5], [2, 6], [3, 7],  # Z-рёбра
-    ], dtype=np.int64)  # (12, 2)
+    edges_local = np.array(
+        [
+            [0, 1],
+            [2, 3],
+            [4, 5],
+            [6, 7],  # X-рёбра
+            [0, 2],
+            [1, 3],
+            [4, 6],
+            [5, 7],  # Y-рёбра
+            [0, 4],
+            [1, 5],
+            [2, 6],
+            [3, 7],  # Z-рёбра
+        ],
+        dtype=np.int64,
+    )  # (12, 2)
 
     # Offsets для каждого бокса
     box_offsets = np.arange(n, dtype=np.int64) * 8  # (n,)
@@ -102,9 +124,7 @@ def visualize_tree(
         opacity: прозрачность wireframe-линий
     """
     if not HAS_PYVISTA:
-        raise ImportError(
-            "PyVista не установлен. Установите: pip install pyvista"
-        )
+        raise ImportError("PyVista не установлен. Установите: pip install pyvista")
 
     if color_by not in ("depth", "fill"):
         raise ValueError(f"color_by must be 'depth' or 'fill', got {color_by!r}")
@@ -153,12 +173,16 @@ def visualize_tree(
             continue
 
         mesh = _build_wireframe_boxes(
-            nx0[lev_mask], ny0[lev_mask], nz0[lev_mask],
-            nx1[lev_mask], ny1[lev_mask], nz1[lev_mask],
+            nx0[lev_mask],
+            ny0[lev_mask],
+            nz0[lev_mask],
+            nx1[lev_mask],
+            ny1[lev_mask],
+            nz1[lev_mask],
         )
 
         # Скалярные данные для раскраски (12 рёбер на бокс → repeat 12)
-        n_boxes = int(lev_mask.sum())
+        int(lev_mask.sum())
         if color_by == "fill":
             scalar_per_box = cnt[lev_mask].astype(np.float64) / max(mpl, 1)
         else:
@@ -196,7 +220,9 @@ def visualize_tree(
             )
         else:
             cloud["radius"] = rad_field
-            spheres = cloud.glyph(scale="radius", geom=pv.Sphere(theta_resolution=8, phi_resolution=8))
+            spheres = cloud.glyph(
+                scale="radius", geom=pv.Sphere(theta_resolution=8, phi_resolution=8)
+            )
             plotter.add_mesh(
                 spheres,
                 color="red",

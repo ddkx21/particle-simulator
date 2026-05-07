@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 from pbm.volume_grid import VolumeGrid
 
+
 class AnalyticalElectrostaticKernel:
     """Аналитическое ядро столкновений для электростатической коалесценции.
 

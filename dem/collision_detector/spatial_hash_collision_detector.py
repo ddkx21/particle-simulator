@@ -139,7 +139,7 @@ class SpatialHashCollisionDetector(CollisionDetector):
         grid_dim = self.ti_grid_dim[None]
         is_periodic = self.ti_boundary_mode[None] == 1
         L_val = self.ti_L[None]
-        hash_table_size = self.ti_hash_table_size[None]
+        self.ti_hash_table_size[None]
 
         for i in range(n):
             pos_i = self.ti_positions[i]
@@ -181,8 +181,14 @@ class SpatialHashCollisionDetector(CollisionDetector):
                             ny = ny % grid_dim
                             nz = nz % grid_dim
                         else:
-                            if (nx < 0 or ny < 0 or nz < 0
-                                    or nx >= grid_dim or ny >= grid_dim or nz >= grid_dim):
+                            if (
+                                nx < 0
+                                or ny < 0
+                                or nz < 0
+                                or nx >= grid_dim
+                                or ny >= grid_dim
+                                or nz >= grid_dim
+                            ):
                                 valid = False
 
                         if valid:
@@ -224,8 +230,14 @@ class SpatialHashCollisionDetector(CollisionDetector):
 
     # --- Public API ---
 
-    def detect(self, positions: np.ndarray, radii: np.ndarray,
-               *, L: float | None = None, boundary_mode: str | None = None) -> tuple[bool, np.ndarray]:
+    def detect(
+        self,
+        positions: np.ndarray,
+        radii: np.ndarray,
+        *,
+        L: float | None = None,
+        boundary_mode: str | None = None,
+    ) -> tuple[bool, np.ndarray]:
         """Обнаружить столкновения между частицами.
 
         Args:

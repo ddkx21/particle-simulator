@@ -3,9 +3,10 @@
 Использует октодерево для отсечения далёких поддеревьев,
 где столкновения невозможны (min_dist > r_i + max_radius[node]).
 """
+
 import numpy as np
-from numpy.typing import NDArray
 import taichi as ti
+from numpy.typing import NDArray
 
 from pbm.volume_grid import VolumeGrid
 
@@ -32,7 +33,8 @@ class TreeCollisionFrequency:
         # Собственные поля
         self.particle_bin = ti.field(dtype=ti.i32, shape=max_particles)
         self.collision_matrix = ti.field(
-            dtype=ti.i32, shape=(grid.n_bins, grid.n_bins),
+            dtype=ti.i32,
+            shape=(grid.n_bins, grid.n_bins),
         )
 
     def compute(
@@ -98,10 +100,12 @@ class TreeCollisionFrequency:
                             if dist_sq <= contact * contact:
                                 bin_j = self.particle_bin[j]
                                 ti.atomic_add(
-                                    self.collision_matrix[bin_i, bin_j], 1,
+                                    self.collision_matrix[bin_i, bin_j],
+                                    1,
                                 )
                                 ti.atomic_add(
-                                    self.collision_matrix[bin_j, bin_i], 1,
+                                    self.collision_matrix[bin_j, bin_i],
+                                    1,
                                 )
 
                     node_idx = self.tree_nodes.next[node_idx]
@@ -112,7 +116,9 @@ class TreeCollisionFrequency:
                 max_contact = r_i + max_r_node
 
                 min_dist_sq = self._min_dist_sq_to_bbox(
-                    pos_i[0], pos_i[1], pos_i[2],
+                    pos_i[0],
+                    pos_i[1],
+                    pos_i[2],
                     self.tree_nodes.min_x[node_idx],
                     self.tree_nodes.min_y[node_idx],
                     self.tree_nodes.min_z[node_idx],
@@ -129,9 +135,15 @@ class TreeCollisionFrequency:
     @ti.func
     def _min_dist_sq_to_bbox(
         self,
-        px: ti.f64, py: ti.f64, pz: ti.f64,
-        bmin_x: ti.f64, bmin_y: ti.f64, bmin_z: ti.f64,
-        bmax_x: ti.f64, bmax_y: ti.f64, bmax_z: ti.f64,
+        px: ti.f64,
+        py: ti.f64,
+        pz: ti.f64,
+        bmin_x: ti.f64,
+        bmin_y: ti.f64,
+        bmin_z: ti.f64,
+        bmax_x: ti.f64,
+        bmax_y: ti.f64,
+        bmax_z: ti.f64,
     ) -> ti.f64:
         dx = ti.f64(0.0)
         if px < bmin_x:

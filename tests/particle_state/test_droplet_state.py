@@ -1,4 +1,5 @@
 """Тесты particle_state/droplet_state.py — DropletState (хранение состояния капель)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,8 +36,7 @@ class TestConstruction:
 # --------------------------------------------------------------------------
 class TestCopy:
     def test_copy_is_independent(self) -> None:
-        state = DropletState(np.array([[1.0, 2.0, 3.0]]), np.array([4.0]),
-                             time=0.0)
+        state = DropletState(np.array([[1.0, 2.0, 3.0]]), np.array([4.0]), time=0.0)
         clone = state.copy()
         clone.positions[0, 0] = 999.0
         assert state.positions[0, 0] == 1.0

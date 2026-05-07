@@ -4,8 +4,14 @@ import numpy as np
 class CollisionDetector:
     """Абстрактный базовый класс для детекторов столкновений."""
 
-    def detect(self, positions: np.ndarray, radii: np.ndarray,
-               *, L: float | None = None, boundary_mode: str | None = None) -> tuple[bool, np.ndarray]:
+    def detect(
+        self,
+        positions: np.ndarray,
+        radii: np.ndarray,
+        *,
+        L: float | None = None,
+        boundary_mode: str | None = None,
+    ) -> tuple[bool, np.ndarray]:
         """Обнаружить столкновения между частицами.
 
         Args:

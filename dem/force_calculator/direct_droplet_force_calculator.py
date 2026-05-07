@@ -1,11 +1,25 @@
 import numpy as np
 import taichi as ti
+
 from .force_calculator_base import ForceCalculator
+
 
 @ti.data_oriented
 class DirectDropletForceCalculator(ForceCalculator):
 
-    def __init__(self, num_particles = 10000, eps_oil=2.85, eta_oil=0.065, eta_water=0.001, rho_water=1000, rho_oil=910, E=3e5, L=1.0, boundary_mode="periodic", correction_grid_resolution=0):
+    def __init__(
+        self,
+        num_particles=10000,
+        eps_oil=2.85,
+        eta_oil=0.065,
+        eta_water=0.001,
+        rho_water=1000,
+        rho_oil=910,
+        E=3e5,
+        L=1.0,
+        boundary_mode="periodic",
+        correction_grid_resolution=0,
+    ):
         self.eps0 = 8.85418781762039e-12  # Электрическая постоянная
         self.eps_oil = eps_oil
         self.eta_oil = eta_oil
@@ -14,7 +28,7 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.rho_oil = rho_oil
         self.E = E
         self.m_const = 12 * np.pi * self.eps0 * eps_oil * E**2
-        self.eta_const = 1/(8 * np.pi * self.eta_oil)
+        self.eta_const = 1 / (8 * np.pi * self.eta_oil)
 
         self.L = L
         self.boundary_mode = boundary_mode  # "periodic" или "open"
@@ -57,7 +71,6 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.corr_self_coeff = ti.field(dtype=ti.f64, shape=())
         self.corr_self_coeff[None] = 0.0
 
-
     def load_periodic_correction(self, correction, L_sim: float):
         """
         Загрузка данных периодической поправки COMSOL в Taichi-поля.
@@ -74,49 +87,60 @@ class DirectDropletForceCalculator(ForceCalculator):
         grid_data = correction.get_grid_data()
 
         # Копируем 3D массивы в Taichi-поля
-        self.corr_grid_u.from_numpy(grid_data['grid_u'])
-        self.corr_grid_v.from_numpy(grid_data['grid_v'])
-        self.corr_grid_w.from_numpy(grid_data['grid_w'])
+        self.corr_grid_u.from_numpy(grid_data["grid_u"])
+        self.corr_grid_v.from_numpy(grid_data["grid_v"])
+        self.corr_grid_w.from_numpy(grid_data["grid_w"])
 
         # Метаданные сетки (сетка одинаковая по всем осям)
-        self.corr_grid_min[None] = grid_data['grid_min']
-        self.corr_grid_inv_dx[None] = 1.0 / grid_data['grid_dx']
-        self.corr_grid_n[None] = grid_data['grid_resolution']
-        self.corr_Fz_inv[None] = 1.0 / grid_data['Fz_comsol']
-        self.corr_L_ratio[None] = grid_data['L_comsol'] / L_sim
-        self.corr_eta_ratio[None] = grid_data['eta_comsol'] / self.eta_oil
+        self.corr_grid_min[None] = grid_data["grid_min"]
+        self.corr_grid_inv_dx[None] = 1.0 / grid_data["grid_dx"]
+        self.corr_grid_n[None] = grid_data["grid_resolution"]
+        self.corr_Fz_inv[None] = 1.0 / grid_data["Fz_comsol"]
+        self.corr_L_ratio[None] = grid_data["L_comsol"] / L_sim
+        self.corr_eta_ratio[None] = grid_data["eta_comsol"] / self.eta_oil
 
         # Self-interaction: G_self = w2(0,0,0) * Fz_inv * eta_ratio * L_ratio (изотропный тензор)
         r0 = np.array([[0.0, 0.0, 0.0]])
         G_z_at_origin = correction.evaluate(r0)
         w_self = float(G_z_at_origin[0, 2])
-        L_ratio = grid_data['L_comsol'] / L_sim
-        eta_ratio = grid_data['eta_comsol'] / self.eta_oil
-        self.corr_self_coeff[None] = w_self / grid_data['Fz_comsol'] * eta_ratio * L_ratio
+        L_ratio = grid_data["L_comsol"] / L_sim
+        eta_ratio = grid_data["eta_comsol"] / self.eta_oil
+        self.corr_self_coeff[None] = w_self / grid_data["Fz_comsol"] * eta_ratio * L_ratio
 
         # Включить поправку
         self.corr_enabled[None] = 1
 
-        print(f"[DirectDropletForceCalculator] Периодическая поправка загружена: "
-              f"сетка {grid_data['grid_resolution']}³, "
-              f"L_ratio={L_ratio:.6f}, "
-              f"Fz_comsol={grid_data['Fz_comsol']:.4e}, "
-              f"eta_ratio={eta_ratio:.6f}, "
-              f"self_coeff={self.corr_self_coeff[None]:.6e}")
-
+        print(
+            f"[DirectDropletForceCalculator] Периодическая поправка загружена: "
+            f"сетка {grid_data['grid_resolution']}³, "
+            f"L_ratio={L_ratio:.6f}, "
+            f"Fz_comsol={grid_data['Fz_comsol']:.4e}, "
+            f"eta_ratio={eta_ratio:.6f}, "
+            f"self_coeff={self.corr_self_coeff[None]:.6e}"
+        )
 
     @staticmethod
     @ti.func
-    def _trilinear_interp(grid: ti.template(), x: ti.f64, y: ti.f64, z: ti.f64,
-                          grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32) -> ti.f64:
+    def _trilinear_interp(
+        grid: ti.template(),
+        x: ti.f64,
+        y: ti.f64,
+        z: ti.f64,
+        grid_min: ti.f64,
+        inv_dx: ti.f64,
+        n: ti.i32,
+    ) -> ti.f64:
         """Трилинейная интерполяция на регулярной 3D сетке с clamping."""
-        ix, iy, iz, tx, ty, tz = DirectDropletForceCalculator._precompute_grid_idx(x, y, z, grid_min, inv_dx, n)
+        ix, iy, iz, tx, ty, tz = DirectDropletForceCalculator._precompute_grid_idx(
+            x, y, z, grid_min, inv_dx, n
+        )
         return DirectDropletForceCalculator._interp_precomp(grid, ix, iy, iz, tx, ty, tz)
 
     @staticmethod
     @ti.func
-    def _precompute_grid_idx(x: ti.f64, y: ti.f64, z: ti.f64,
-                             grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32):
+    def _precompute_grid_idx(
+        x: ti.f64, y: ti.f64, z: ti.f64, grid_min: ti.f64, inv_dx: ti.f64, n: ti.i32
+    ):
         fx = (x - grid_min) * inv_dx
         fy = (y - grid_min) * inv_dx
         fz = (z - grid_min) * inv_dx
@@ -134,9 +158,9 @@ class DirectDropletForceCalculator(ForceCalculator):
 
     @staticmethod
     @ti.func
-    def _interp_precomp(grid: ti.template(),
-                        ix: ti.i32, iy: ti.i32, iz: ti.i32,
-                        tx: ti.f64, ty: ti.f64, tz: ti.f64) -> ti.f64:
+    def _interp_precomp(
+        grid: ti.template(), ix: ti.i32, iy: ti.i32, iz: ti.i32, tx: ti.f64, ty: ti.f64, tz: ti.f64
+    ) -> ti.f64:
         c000 = grid[ix, iy, iz]
         c001 = grid[ix, iy, iz + 1]
         c010 = grid[ix, iy + 1, iz]
@@ -145,15 +169,16 @@ class DirectDropletForceCalculator(ForceCalculator):
         c101 = grid[ix + 1, iy, iz + 1]
         c110 = grid[ix + 1, iy + 1, iz]
         c111 = grid[ix + 1, iy + 1, iz + 1]
-        return (c000 * (1 - tx) * (1 - ty) * (1 - tz) +
-                c001 * (1 - tx) * (1 - ty) * tz +
-                c010 * (1 - tx) * ty * (1 - tz) +
-                c011 * (1 - tx) * ty * tz +
-                c100 * tx * (1 - ty) * (1 - tz) +
-                c101 * tx * (1 - ty) * tz +
-                c110 * tx * ty * (1 - tz) +
-                c111 * tx * ty * tz)
-
+        return (
+            c000 * (1 - tx) * (1 - ty) * (1 - tz)
+            + c001 * (1 - tx) * (1 - ty) * tz
+            + c010 * (1 - tx) * ty * (1 - tz)
+            + c011 * (1 - tx) * ty * tz
+            + c100 * tx * (1 - ty) * (1 - tz)
+            + c101 * tx * (1 - ty) * tz
+            + c110 * tx * ty * (1 - tz)
+            + c111 * tx * ty * tz
+        )
 
     @staticmethod
     @ti.func
@@ -162,27 +187,30 @@ class DirectDropletForceCalculator(ForceCalculator):
         force_on_i = ti.Vector([0.0, 0.0, 0.0], dt=ti.f64)
 
         M_ik_per_r_mag7 = m_const * radii_i**3 * radii_j**3 / r_mag**7
- 
+
         dx_squared, dy_squared, dz_squared = dx**2, dy**2, dz**2
 
         force_xy_per_delta = M_ik_per_r_mag7 * (4 * dz_squared - dx_squared - dy_squared)
         force_on_i[0] = force_xy_per_delta * dx  # Компонента по x
         force_on_i[1] = force_xy_per_delta * dy  # Компонента по y
-        force_on_i[2] = M_ik_per_r_mag7 * (2 * dz_squared - 3 * dx_squared - 3 * dy_squared) * dz  # Компонента по z
+        force_on_i[2] = (
+            M_ik_per_r_mag7 * (2 * dz_squared - 3 * dx_squared - 3 * dy_squared) * dz
+        )  # Компонента по z
 
         return force_on_i
 
-
     @ti.kernel
-    def _calculate_forces(self,
-                          ti_num_particles: ti.template(),
-                          ti_x: ti.template(),
-                          ti_y: ti.template(),
-                          ti_z: ti.template(),
-                          radii: ti.template(),
-                          ti_fx: ti.template(),
-                          ti_fy: ti.template(),
-                          ti_fz: ti.template()):
+    def _calculate_forces(
+        self,
+        ti_num_particles: ti.template(),
+        ti_x: ti.template(),
+        ti_y: ti.template(),
+        ti_z: ti.template(),
+        radii: ti.template(),
+        ti_fx: ti.template(),
+        ti_fy: ti.template(),
+        ti_fz: ti.template(),
+    ):
 
         num_particles = ti_num_particles[None]
         is_periodic = self.boundary_mode_int[None]
@@ -216,12 +244,13 @@ class DirectDropletForceCalculator(ForceCalculator):
                     r_sum = radii[i] + radii[j]
 
                     if r_mag > r_sum:
-                        force_on_i += self._calculate_one_force(self.m_const, dx, dy, dz, r_mag, radii[i], radii[j])
+                        force_on_i += self._calculate_one_force(
+                            self.m_const, dx, dy, dz, r_mag, radii[i], radii[j]
+                        )
 
             ti_fx[i] = force_on_i[0]
             ti_fy[i] = force_on_i[1]
             ti_fz[i] = force_on_i[2]
-    
 
     @ti.kernel
     def update_values(self, ti_radii: ti.template(), radii: ti.types.ndarray(), size: ti.i32):
@@ -241,9 +270,18 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.update_values(self.ti_x, np.ascontiguousarray(positions[:, 0]), self.num_particles)
         self.update_values(self.ti_y, np.ascontiguousarray(positions[:, 1]), self.num_particles)
         self.update_values(self.ti_z, np.ascontiguousarray(positions[:, 2]), self.num_particles)
-        
+
         # Вызываем расчет сил
-        self._calculate_forces(self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z, self.ti_radii, self.ti_fx, self.ti_fy, self.ti_fz)
+        self._calculate_forces(
+            self.ti_num_particles,
+            self.ti_x,
+            self.ti_y,
+            self.ti_z,
+            self.ti_radii,
+            self.ti_fx,
+            self.ti_fy,
+            self.ti_fz,
+        )
 
         # Копируем силы обратно в numpy
         fx = self.ti_fx.to_numpy()
@@ -253,7 +291,7 @@ class DirectDropletForceCalculator(ForceCalculator):
         forces = np.stack((fx, fy, fz), axis=1)
 
         # Оставляем только self.num_particles значений силы (хвосты лишние)
-        forces = forces[:self.num_particles]
+        forces = forces[: self.num_particles]
 
         # Очищаем память
         self.ti_x.fill(0)
@@ -266,10 +304,10 @@ class DirectDropletForceCalculator(ForceCalculator):
 
         return forces
 
+    def calculate_convection(
+        self, positions: np.ndarray, radii: np.ndarray, forces: np.ndarray
+    ) -> np.ndarray:
 
-
-    def calculate_convection(self, positions: np.ndarray, radii: np.ndarray, forces: np.ndarray) -> np.ndarray:
-        
         self.num_particles = positions.shape[0]
         self.ti_num_particles[None] = self.num_particles
 
@@ -288,7 +326,18 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.update_values(self.ti_fz, np.ascontiguousarray(forces[:, 2]), self.num_particles)
 
         # Вызываем расчет скоростей
-        self._calculate_convection_velocities(self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z, self.ti_fx, self.ti_fy, self.ti_fz, self.ti_vx, self.ti_vy, self.ti_vz)
+        self._calculate_convection_velocities(
+            self.ti_num_particles,
+            self.ti_x,
+            self.ti_y,
+            self.ti_z,
+            self.ti_fx,
+            self.ti_fy,
+            self.ti_fz,
+            self.ti_vx,
+            self.ti_vy,
+            self.ti_vz,
+        )
 
         # Копируем скорости обратно в numpy
         vx = self.ti_vx.to_numpy()
@@ -298,24 +347,25 @@ class DirectDropletForceCalculator(ForceCalculator):
         velocities = np.stack((vx, vy, vz), axis=1)
 
         # Оставляем только self.num_particles значений скоростей (хвосты лишние)
-        velocities = velocities[:self.num_particles]
+        velocities = velocities[: self.num_particles]
 
         return velocities
 
-
     @ti.kernel
-    def _calculate_convection_velocities(self, 
-                              ti_num_particles: ti.template(), 
-                              ti_x: ti.template(), 
-                              ti_y: ti.template(), 
-                              ti_z: ti.template(), 
-                              ti_fx: ti.template(),
-                              ti_fy: ti.template(),
-                              ti_fz: ti.template(),
-                              ti_vx: ti.template(), 
-                              ti_vy: ti.template(), 
-                              ti_vz: ti.template()):
-        
+    def _calculate_convection_velocities(
+        self,
+        ti_num_particles: ti.template(),
+        ti_x: ti.template(),
+        ti_y: ti.template(),
+        ti_z: ti.template(),
+        ti_fx: ti.template(),
+        ti_fy: ti.template(),
+        ti_fz: ti.template(),
+        ti_vx: ti.template(),
+        ti_vy: ti.template(),
+        ti_vz: ti.template(),
+    ):
+
         num_particles = ti_num_particles[None]
         is_periodic = self.boundary_mode_int[None]
         L_v = self.L_val[None]
@@ -348,9 +398,15 @@ class DirectDropletForceCalculator(ForceCalculator):
                     fy = ti_fy[j]
                     fz = ti_fz[j]
 
-                    V_x = self.eta_const * ((1/r + (x**2)/r**3) * fx + (x * y)/r**3 * fy + (x * z)/r**3 * fz)
-                    V_y = self.eta_const * ((x * y)/r**3 * fx + (1/r + (y**2)/r**3) * fy + (y * z)/r**3 * fz)
-                    V_z = self.eta_const * ((x * z)/r**3 * fx + (y * z)/r**3 * fy + (1/r + (z**2)/r**3) * fz)
+                    V_x = self.eta_const * (
+                        (1 / r + (x**2) / r**3) * fx + (x * y) / r**3 * fy + (x * z) / r**3 * fz
+                    )
+                    V_y = self.eta_const * (
+                        (x * y) / r**3 * fx + (1 / r + (y**2) / r**3) * fy + (y * z) / r**3 * fz
+                    )
+                    V_z = self.eta_const * (
+                        (x * z) / r**3 * fx + (y * z) / r**3 * fy + (1 / r + (z**2) / r**3) * fz
+                    )
 
                     convection_at_i += ti.Vector([V_x, V_y, V_z])
 
@@ -368,19 +424,25 @@ class DirectDropletForceCalculator(ForceCalculator):
                         eta_r = self.corr_eta_ratio[None]
 
                         # G_z: (xc, yc, zc) — предвычисление индексов один раз
-                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(xc, yc, zc, gmin, ginv, gn)
+                        i1x, i1y, i1z, t1x, t1y, t1z = self._precompute_grid_idx(
+                            xc, yc, zc, gmin, ginv, gn
+                        )
                         gz_x = self._interp_precomp(self.corr_grid_u, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_y = self._interp_precomp(self.corr_grid_v, i1x, i1y, i1z, t1x, t1y, t1z)
                         gz_z = self._interp_precomp(self.corr_grid_w, i1x, i1y, i1z, t1x, t1y, t1z)
 
                         # G_x: перестановка x↔z → (zc, yc, xc)
-                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(zc, yc, xc, gmin, ginv, gn)
+                        i2x, i2y, i2z, t2x, t2y, t2z = self._precompute_grid_idx(
+                            zc, yc, xc, gmin, ginv, gn
+                        )
                         gx_x = self._interp_precomp(self.corr_grid_w, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_y = self._interp_precomp(self.corr_grid_v, i2x, i2y, i2z, t2x, t2y, t2z)
                         gx_z = self._interp_precomp(self.corr_grid_u, i2x, i2y, i2z, t2x, t2y, t2z)
 
                         # G_y: перестановка y↔z → (xc, zc, yc)
-                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(xc, zc, yc, gmin, ginv, gn)
+                        i3x, i3y, i3z, t3x, t3y, t3z = self._precompute_grid_idx(
+                            xc, zc, yc, gmin, ginv, gn
+                        )
                         gy_x = self._interp_precomp(self.corr_grid_u, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_y = self._interp_precomp(self.corr_grid_w, i3x, i3y, i3z, t3x, t3y, t3z)
                         gy_z = self._interp_precomp(self.corr_grid_v, i3x, i3y, i3z, t3x, t3y, t3z)
@@ -405,7 +467,6 @@ class DirectDropletForceCalculator(ForceCalculator):
             ti_vy[i] = convection_at_i[1]
             ti_vz[i] = convection_at_i[2]
 
-
     def calculate_forces_and_convection(self, positions: np.ndarray, radii: np.ndarray) -> tuple:
         self.num_particles = positions.shape[0]
         self.ti_num_particles[None] = self.num_particles
@@ -419,21 +480,38 @@ class DirectDropletForceCalculator(ForceCalculator):
         self.update_values(self.ti_z, np.ascontiguousarray(positions[:, 2]), self.num_particles)
 
         self._calculate_forces(
-            self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z,
-            self.ti_radii, self.ti_fx, self.ti_fy, self.ti_fz)
+            self.ti_num_particles,
+            self.ti_x,
+            self.ti_y,
+            self.ti_z,
+            self.ti_radii,
+            self.ti_fx,
+            self.ti_fy,
+            self.ti_fz,
+        )
 
         self._calculate_convection_velocities(
-            self.ti_num_particles, self.ti_x, self.ti_y, self.ti_z,
-            self.ti_fx, self.ti_fy, self.ti_fz,
-            self.ti_vx, self.ti_vy, self.ti_vz)
+            self.ti_num_particles,
+            self.ti_x,
+            self.ti_y,
+            self.ti_z,
+            self.ti_fx,
+            self.ti_fy,
+            self.ti_fz,
+            self.ti_vx,
+            self.ti_vy,
+            self.ti_vz,
+        )
 
         n = self.num_particles
-        forces = np.stack((self.ti_fx.to_numpy()[:n],
-                           self.ti_fy.to_numpy()[:n],
-                           self.ti_fz.to_numpy()[:n]), axis=1)
-        velocities = np.stack((self.ti_vx.to_numpy()[:n],
-                               self.ti_vy.to_numpy()[:n],
-                               self.ti_vz.to_numpy()[:n]), axis=1)
+        forces = np.stack(
+            (self.ti_fx.to_numpy()[:n], self.ti_fy.to_numpy()[:n], self.ti_fz.to_numpy()[:n]),
+            axis=1,
+        )
+        velocities = np.stack(
+            (self.ti_vx.to_numpy()[:n], self.ti_vy.to_numpy()[:n], self.ti_vz.to_numpy()[:n]),
+            axis=1,
+        )
 
         self.ti_x.fill(0)
         self.ti_y.fill(0)

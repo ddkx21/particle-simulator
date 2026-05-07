@@ -13,9 +13,9 @@
 - mpl: max particles per leaf — контролирует глубину дерева
 """
 
-from .octree_node import OctreeNode
 from .flat_tree import FlatOctree
 from .force_tree import TreeDropletForceCalculator
+from .octree_node import OctreeNode
 from .tree_stats import TreeStatistics, compute_tree_stats, print_tree_stats
 
 try:
@@ -24,11 +24,11 @@ except ImportError:
     pass
 
 __all__ = [
-    'OctreeNode',
-    'FlatOctree',
-    'TreeDropletForceCalculator',
-    'TreeStatistics',
-    'compute_tree_stats',
-    'print_tree_stats',
-    'visualize_tree',
+    "OctreeNode",
+    "FlatOctree",
+    "TreeDropletForceCalculator",
+    "TreeStatistics",
+    "compute_tree_stats",
+    "print_tree_stats",
+    "visualize_tree",
 ]

@@ -1,4 +1,5 @@
 """Тесты octree/tree_stats.py — извлечение статистики построенного октодерева."""
+
 from __future__ import annotations
 
 import numpy as np

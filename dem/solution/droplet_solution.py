@@ -1,14 +1,25 @@
-import time
 import os.path
+import time
+
 import numpy as np
+
 from ..particle_state import DropletState
 from .solution_base import Solution
 
+
 class DropletSolution(Solution):
-    def __init__(self, initial_droplet_state, real_time_visualization=False, update_interval=0.05, length=10, previous=None, filename=None):
+    def __init__(
+        self,
+        initial_droplet_state,
+        real_time_visualization=False,
+        update_interval=0.05,
+        length=10,
+        previous=None,
+        filename=None,
+    ):
         """
         Инициализация объекта Solution для хранения траекторий частиц.
-        
+
         :param droplet_state: Объект для хранения нчального состояния системы капель.
         :param real_time_visualization: Флаг отображения графика в реальном времени. Замедляет работу программы!
         :param update_interval: Интервал обновления графика в секундах.
@@ -36,11 +47,11 @@ class DropletSolution(Solution):
         # Ссылки на предыдущее и следующее решения
         self._prev = previous
         self._next = None
-        
+
         # Данные о столкновениях
         self.is_collision = False
-        self.collided_droplets = [] # Индексы столкнувшихся частиц в этом решении
-        self.resulting_droplet = [] # Индекс образовавшийся частицы в следующем решении
+        self.collided_droplets = []  # Индексы столкнувшихся частиц в этом решении
+        self.resulting_droplet = []  # Индекс образовавшийся частицы в следующем решении
 
         # Текущий шаг симуляции
         self.current_step = -1
@@ -87,7 +98,7 @@ class DropletSolution(Solution):
         :return: Массив временных отсчетов (length x 1).
         """
         # Возвращаем только записанные шаги (по current_step)
-        return self.times[:self.current_step + 1]
+        return self.times[: self.current_step + 1]
 
     def get_trajectories(self):
         """
@@ -96,16 +107,15 @@ class DropletSolution(Solution):
         :return: Массив траекторий частиц (num_steps x num_particles x 3).
         """
         # Возвращаем только записанные шаги (по current_step)
-        return self.trajectories[:self.current_step + 1]
+        return self.trajectories[: self.current_step + 1]
 
     def get_current_time(self):
-        """ 
+        """
         Получение текущего времени симуляции.
 
         :return: Текущее время симуляции.
         """
         return self.times[self.current_step][0]
-
 
     def get_last_time(self):
         """
@@ -118,7 +128,6 @@ class DropletSolution(Solution):
         valid_steps = np.where(np.any(self.times != 0, axis=0))[0]
         return self.times[valid_steps[-1]]
 
-
     def get_chain_start_time(self):
         """
         Получение времени начала цепи.
@@ -129,7 +138,7 @@ class DropletSolution(Solution):
         while current_solution._prev is not None:
             current_solution = current_solution._prev
         return current_solution.times[0][0]
-    
+
     def get_chain_end_time(self):
         """
         Получение времени окончания цепи.
@@ -151,7 +160,7 @@ class DropletSolution(Solution):
         while current_solution._prev is not None:
             current_solution = current_solution._prev
         return current_solution
-    
+
     def get_current_positions(self):
         """
         Получение текущих позиций всех частиц.
@@ -177,12 +186,11 @@ class DropletSolution(Solution):
         while next is not None:
             next.compact()
             next = next._next
-        
+
         prev = self._prev
         while prev is not None:
             prev.compact()
             prev = prev._prev
-
 
     def should_update_visualization(self):
         """
@@ -200,7 +208,7 @@ class DropletSolution(Solution):
     def generate_next_solution(self):
         """
         Генерация следующего решения после нескольких столкновений.
-        
+
         :return: Следующее решение.
         """
         # Массивы новых радиусов и позиций капель
@@ -210,7 +218,7 @@ class DropletSolution(Solution):
         # Для сохранения новых капель
         new_droplets_radii = []
         new_droplets_positions = []
-        
+
         # Для сохранения индексов новых капель
         resulting_droplet = []
 
@@ -235,10 +243,12 @@ class DropletSolution(Solution):
             radius2_cube = radius2**3
 
             # Новый радиус исходя из сохранения объема
-            new_radius = (radius1_cube + radius2_cube)**(1/3)
+            new_radius = (radius1_cube + radius2_cube) ** (1 / 3)
 
             # Новая позиция капли (центр масс)
-            new_position = (position1 * radius1_cube + position2 * radius2_cube) / (radius1_cube + radius2_cube)
+            new_position = (position1 * radius1_cube + position2 * radius2_cube) / (
+                radius1_cube + radius2_cube
+            )
 
             # Сохраняем радиусы и позиции новых капель в отдельные массивы
             new_droplets_radii.append(new_radius)
@@ -267,7 +277,7 @@ class DropletSolution(Solution):
             real_time_visualization=self.real_time_visualization,
             update_interval=self.update_interval,
             length=self.length,
-            previous=self
+            previous=self,
         )
         self._next = next_solution
 
@@ -276,23 +286,22 @@ class DropletSolution(Solution):
 
         return next_solution
 
-
     def save_to_file(self, filename):
         """
         Сохранение решения (траекторий) в файл.
 
         :param filename: Имя файла для сохранения решения.
         """
-        np.savez(filename, 
-                 num_particles=self.num_particles,
-                 radii=self.radii,
-                 times=self.get_times(), 
-                 trajectories=self.get_trajectories()
-                 )
+        np.savez(
+            filename,
+            num_particles=self.num_particles,
+            radii=self.radii,
+            times=self.get_times(),
+            trajectories=self.get_trajectories(),
+        )
         print(f"Решение сохранено в файл {filename}.")
 
     def load_from_file(self, filename):
-
         """
         Загрузка решения (траекторий) из файла.
 
@@ -300,10 +309,10 @@ class DropletSolution(Solution):
         """
         # Не подгружает другие поля, надо доработать
         data = np.load(filename)
-        self.num_particles = data['num_particles']
-        self.radii = data['radii']
-        self.times = data['times']
-        self.trajectories = data['trajectories']
+        self.num_particles = data["num_particles"]
+        self.radii = data["radii"]
+        self.times = data["times"]
+        self.trajectories = data["trajectories"]
         self.length = len(self.times)
 
         # Измвлекаем имя файла
@@ -313,18 +322,18 @@ class DropletSolution(Solution):
 
         print(f"Решение загружено из файла {filename}.")
 
-    def save_chain_to_file(self, filename, precision='float64'):
+    def save_chain_to_file(self, filename, precision="float64"):
         """
         Сохранение всей цепочки решений в файл.
-        
+
         :param filename: Имя файла для сохранения всей цепочки решений.
         :param precision: Точность сохранения данных ('float64', 'float32' или 'float16').
         """
 
         # Определяем numpy тип на основе заданной точности
-        if precision == 'float32':
+        if precision == "float32":
             dtype = np.float32
-        elif precision == 'float16':
+        elif precision == "float16":
             dtype = np.float16
         else:
             dtype = np.float64
@@ -340,16 +349,16 @@ class DropletSolution(Solution):
         while current_solution is not None:
             current_solution.compact()
             solution_data = {
-                'num_particles': current_solution.num_particles,
-                'radii': current_solution.radii.astype(dtype),
-                'length': current_solution.length,
-                'real_time_visualization': current_solution.real_time_visualization,
-                'update_interval': current_solution.update_interval,
-                'times': current_solution.get_times().astype(dtype),
-                'trajectories': current_solution.get_trajectories().astype(dtype),
-                'is_collision': current_solution.is_collision,
-                'collided_droplets': current_solution.collided_droplets,
-                'resulting_droplet': current_solution.resulting_droplet
+                "num_particles": current_solution.num_particles,
+                "radii": current_solution.radii.astype(dtype),
+                "length": current_solution.length,
+                "real_time_visualization": current_solution.real_time_visualization,
+                "update_interval": current_solution.update_interval,
+                "times": current_solution.get_times().astype(dtype),
+                "trajectories": current_solution.get_trajectories().astype(dtype),
+                "is_collision": current_solution.is_collision,
+                "collided_droplets": current_solution.collided_droplets,
+                "resulting_droplet": current_solution.resulting_droplet,
             }
             solution_list.append(solution_data)
             current_solution = current_solution._next
@@ -362,18 +371,18 @@ class DropletSolution(Solution):
     def load_chain_from_file(filename):
         """
         Загрузка всей цепочки решений из файла.
-        
+
         :param filename: Имя файла для загрузки всей цепочки решений.
         :return: Первый объект DropletSolution.
         """
-        
+
         # Измвлекаем имя файла
         fname = os.path.basename(filename)
         fname = os.path.splitext(fname)[0]
-        
+
         # Загружаем данные из файла
         data = np.load(filename, allow_pickle=True)
-        solution_list = data['solutions']
+        solution_list = data["solutions"]
 
         # Восстанавливаем цепочку решений
         first_solution = None
@@ -382,25 +391,24 @@ class DropletSolution(Solution):
         for solution_data in solution_list:
             # Восстановление начального состояния для каждого решения
             initial_state = DropletState(
-                solution_data['trajectories'][0],
-                solution_data['radii'], 
-                solution_data['times'][0])
+                solution_data["trajectories"][0], solution_data["radii"], solution_data["times"][0]
+            )
 
             # Создаем новое решение
             new_solution = DropletSolution(
                 initial_droplet_state=initial_state,
-                real_time_visualization=solution_data['real_time_visualization'],
-                update_interval=solution_data['update_interval'],
-                length=solution_data['length'],
+                real_time_visualization=solution_data["real_time_visualization"],
+                update_interval=solution_data["update_interval"],
+                length=solution_data["length"],
                 previous=previous_solution,
-                filename=fname
+                filename=fname,
             )
             # Заполняем атрибуты решения
-            new_solution.times = solution_data['times']
-            new_solution.trajectories = solution_data['trajectories']
-            new_solution.is_collision = solution_data['is_collision']
-            new_solution.collided_droplets = solution_data['collided_droplets']
-            new_solution.resulting_droplet = solution_data['resulting_droplet']
+            new_solution.times = solution_data["times"]
+            new_solution.trajectories = solution_data["trajectories"]
+            new_solution.is_collision = solution_data["is_collision"]
+            new_solution.collided_droplets = solution_data["collided_droplets"]
+            new_solution.resulting_droplet = solution_data["resulting_droplet"]
 
             if previous_solution is not None:
                 previous_solution._next = new_solution
@@ -411,7 +419,6 @@ class DropletSolution(Solution):
 
         print(f"Цепочка решений загружена из файла {filename}.")
         return first_solution
-
 
     def get_state(self, target_time):
         """
@@ -432,12 +439,16 @@ class DropletSolution(Solution):
                 if current_solution._prev is not None:
                     current_solution = current_solution._prev
                 else:
-                    raise ValueError(f"Время {target_time} меньше, чем минимальное время в цепочке решений.")
+                    raise ValueError(
+                        f"Время {target_time} меньше, чем минимальное время в цепочке решений."
+                    )
             elif target_time > max_time:
                 if current_solution._next is not None:
                     current_solution = current_solution._next
                 else:
-                    raise ValueError(f"Время {target_time} больше, чем максимальное время в цепочке решений.")
+                    raise ValueError(
+                        f"Время {target_time} больше, чем максимальное время в цепочке решений."
+                    )
             else:
                 break  # Время находится внутри текущего решения
 
@@ -466,11 +477,14 @@ class DropletSolution(Solution):
         else:
             # Интерполяция по времени
             factor = (target_time - time_before) / (time_after - time_before)
-            interpolated_positions = positions_before + factor * (positions_after - positions_before)
+            interpolated_positions = positions_before + factor * (
+                positions_after - positions_before
+            )
 
         # Возвращаем интерполированный DropletState
-        return DropletState(positions=interpolated_positions, radii=current_solution.radii, time=target_time)
-
+        return DropletState(
+            positions=interpolated_positions, radii=current_solution.radii, time=target_time
+        )
 
     def get_name(self):
         """
@@ -482,4 +496,4 @@ class DropletSolution(Solution):
         if first_solution.filename is not None:
             return first_solution.filename
         else:
-            return ''
+            return ""

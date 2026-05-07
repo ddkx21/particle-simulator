@@ -4,6 +4,7 @@
   `import octree`, `import collision_detector` и т.д.).
 - Однократная инициализация Taichi на CPU/f64 для всех тестов сессии.
 """
+
 from __future__ import annotations
 
 import sys
@@ -24,6 +25,7 @@ def taichi_session():
     pbm.collision_frequency.tree_collision_freq) делят один runtime.
     """
     import taichi as ti
+
     ti.init(arch=ti.cpu, default_fp=ti.f64)
     yield
     # Taichi не требует явного shutdown; следующий ti.init() пересоздаст runtime.

@@ -4,12 +4,12 @@ EulerDropletSolver — интегратор Эйлера для движения
 Используются минимальные стабы для force_calculator/post_processor,
 чтобы тестировать сам решатель в изоляции.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import numpy as np
-import pytest
 
 from dem.particle_state import DropletState
 from dem.solution import DropletSolution
@@ -22,6 +22,7 @@ from dem.solver import EulerDropletSolver
 @dataclass
 class StubForceCalculator:
     """Force calculator c постоянной силой (0,0,F) и без конвекции."""
+
     F: float = 1e-12
     L: float = 1.0
     eta_oil: float = 0.065
@@ -54,17 +55,16 @@ class StubPostProcessor:
         pass
 
 
-def _make_solver(F: float = 1e-12, n: int = 2,
-                 collision_detector=None) -> EulerDropletSolver:
+def _make_solver(F: float = 1e-12, n: int = 2, collision_detector=None) -> EulerDropletSolver:
     positions = np.zeros((n, 3))
     radii = np.full(n, 50e-6)
     state = DropletState(positions, radii, time=0.0)
     sol = DropletSolution(initial_droplet_state=state, length=20)
     fc = StubForceCalculator(F=F)
     pp = StubPostProcessor()
-    return EulerDropletSolver(force_calculator=fc, solution=sol,
-                              post_processor=pp,
-                              collision_detector=collision_detector)
+    return EulerDropletSolver(
+        force_calculator=fc, solution=sol, post_processor=pp, collision_detector=collision_detector
+    )
 
 
 # --------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 """Тесты octree/flat_tree.py — FlatOctree (плоское октодерево)."""
+
 from __future__ import annotations
 
 import numpy as np

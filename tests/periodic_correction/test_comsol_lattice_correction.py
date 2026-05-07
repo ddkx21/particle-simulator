@@ -2,6 +2,7 @@
 
 COMSOLLatticeCorrection — загрузка/интерполяция периодической поправки COMSOL.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -51,13 +52,16 @@ class TestRegularGrid:
 # evaluate(): сырой столбец и тензорная свёртка
 # --------------------------------------------------------------------------
 class TestEvaluate:
-    def test_evaluate_no_force_returns_three_components(self, correction: COMSOLLatticeCorrection) -> None:
-        r = np.array([[0.0, 0.0, 0.0],
-                      [correction.L_comsol * 0.1, 0.0, 0.0]])
+    def test_evaluate_no_force_returns_three_components(
+        self, correction: COMSOLLatticeCorrection
+    ) -> None:
+        r = np.array([[0.0, 0.0, 0.0], [correction.L_comsol * 0.1, 0.0, 0.0]])
         out = correction.evaluate(r)
         assert out.shape == (2, 3)
 
-    def test_evaluate_with_force_full_convolution(self, correction: COMSOLLatticeCorrection) -> None:
+    def test_evaluate_with_force_full_convolution(
+        self, correction: COMSOLLatticeCorrection
+    ) -> None:
         r = np.array([[correction.L_comsol * 0.1, 0.0, 0.0]])
         F = np.array([[0.0, 0.0, correction.Fz_comsol]])
         out = correction.evaluate(r, F)
@@ -79,20 +83,29 @@ class TestEvaluate:
 class TestGridData:
     def test_grid_data_keys(self, correction: COMSOLLatticeCorrection) -> None:
         data = correction.get_grid_data()
-        for key in ('grid_u', 'grid_v', 'grid_w', 'grid_min', 'grid_max',
-                    'grid_dx', 'grid_resolution', 'L_comsol', 'Fz_comsol',
-                    'eta_comsol'):
+        for key in (
+            "grid_u",
+            "grid_v",
+            "grid_w",
+            "grid_min",
+            "grid_max",
+            "grid_dx",
+            "grid_resolution",
+            "L_comsol",
+            "Fz_comsol",
+            "eta_comsol",
+        ):
             assert key in data
 
     def test_grid_min_max_symmetric(self, correction: COMSOLLatticeCorrection) -> None:
         data = correction.get_grid_data()
-        np.testing.assert_allclose(data['grid_min'], -data['grid_max'])
+        np.testing.assert_allclose(data["grid_min"], -data["grid_max"])
 
     def test_grid_dx_consistent(self, correction: COMSOLLatticeCorrection) -> None:
         data = correction.get_grid_data()
-        N = data['grid_resolution']
-        expected_dx = (data['grid_max'] - data['grid_min']) / (N - 1)
-        np.testing.assert_allclose(data['grid_dx'], expected_dx, rtol=1e-12)
+        N = data["grid_resolution"]
+        expected_dx = (data["grid_max"] - data["grid_min"]) / (N - 1)
+        np.testing.assert_allclose(data["grid_dx"], expected_dx, rtol=1e-12)
 
 
 # --------------------------------------------------------------------------

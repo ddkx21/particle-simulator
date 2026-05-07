@@ -2,6 +2,7 @@
 
 DropletSolution — хранение траекторий, цепочка решений после столкновений.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -72,9 +73,7 @@ class TestAccessors:
 # --------------------------------------------------------------------------
 class TestNextSolution:
     def test_collision_merges_two_drops(self) -> None:
-        positions = np.array([[0.0, 0.0, 0.0],
-                              [0.1, 0.0, 0.0],
-                              [0.5, 0.5, 0.5]])
+        positions = np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.5, 0.5, 0.5]])
         radii = np.array([0.05, 0.05, 0.05])
         state = DropletState(positions, radii, time=0.0)
         sol = DropletSolution(initial_droplet_state=state, length=5)
@@ -84,7 +83,7 @@ class TestNextSolution:
         # 3 капли → 2 (одна слилась)
         assert next_sol.num_particles == 2
         # Сохранение объёма: r_new^3 = r1^3 + r2^3
-        expected_v = 2 * (0.05 ** 3)
+        expected_v = 2 * (0.05**3)
         # Последний радиус — слившаяся капля
         assert np.isclose(next_sol.radii[-1] ** 3, expected_v)
         # Связь prev/next

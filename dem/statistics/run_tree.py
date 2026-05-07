@@ -5,9 +5,9 @@
 Результат: statistics/results/statistics_tree.npz
 """
 
-import sys
-import os
 import json
+import os
+import sys
 import time
 
 import numpy as np
@@ -27,10 +27,9 @@ def load_config(path=CONFIG_PATH):
 
 def compute_box_size(N, radii_range, water_volume_content):
     rr = np.array(radii_range)
-    return float(np.cbrt(
-        (np.pi * N * np.sum(rr) * np.sum(np.square(rr)))
-        / (3 * water_volume_content)
-    ))
+    return float(
+        np.cbrt((np.pi * N * np.sum(rr) * np.sum(np.square(rr))) / (3 * water_volume_content))
+    )
 
 
 def run_single_simulation(cfg, box_size):
@@ -59,15 +58,19 @@ def run_single_simulation(cfg, box_size):
 
     force_calculator = TreeDropletForceCalculator(
         num_particles=num_particles,
-        theta=tree_cfg["theta"], mpl=tree_cfg["mpl"],
-        eps_oil=phys["eps_oil"], eta_oil=phys["eta_oil"],
+        theta=tree_cfg["theta"],
+        mpl=tree_cfg["mpl"],
+        eps_oil=phys["eps_oil"],
+        eta_oil=phys["eta_oil"],
         eta_water=phys["eta_water"],
-        E=phys["E"], L=box_size,
+        E=phys["E"],
+        L=box_size,
         periodic=(phys["boundary_mode"] == "periodic"),
     )
 
     collision_detector = SpatialHashCollisionDetector(
-        num_particles=num_particles, L=box_size,
+        num_particles=num_particles,
+        L=box_size,
         boundary_mode=phys["boundary_mode"],
     )
     solution = DropletSolution(
@@ -140,14 +143,14 @@ def main():
     ti_cfg = cfg["taichi"]
 
     import taichi as ti
+
     ti.init(
         arch=getattr(ti, ti_cfg["arch"]),
         cpu_max_num_threads=ti_cfg["cpu_max_num_threads"],
         default_fp=ti.f64,
     )
 
-    box_size = compute_box_size(sim["N"], phys["radii_range"],
-                                phys["water_volume_content"])
+    box_size = compute_box_size(sim["N"], phys["radii_range"], phys["water_volume_content"])
 
     print(f"Tree-метод: N={sim['N']}, dt={sim['dt']}, t_stop={sim['t_stop']}")
     print(f"box_size={box_size:.6e}, boundary_mode={phys['boundary_mode']}")
@@ -160,9 +163,11 @@ def main():
     for i in range(sim["num_runs"]):
         result = run_single_simulation(cfg, box_size)
         results.append(result)
-        print(f"Tree {i+1}/{sim['num_runs']} done, "
-              f"elapsed: {result['elapsed_time']:.1f} сек, "
-              f"N_final={result['droplet_counts'][-1]}")
+        print(
+            f"Tree {i+1}/{sim['num_runs']} done, "
+            f"elapsed: {result['elapsed_time']:.1f} сек, "
+            f"N_final={result['droplet_counts'][-1]}"
+        )
 
     output_path = os.path.join(RESULTS_DIR, "statistics_tree.npz")
     save_phase_results(results, output_path, cfg)

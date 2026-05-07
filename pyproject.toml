@@ -102,6 +102,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["B011"]  # assert False допустим в тестах
 "dem/**/__init__.py" = ["F401"]  # re-exports
+"dem/statistics/run_statistics.py" = ["E402"]  # sys.path manipulation перед импортами
+"dem/octree/flat_tree.py" = ["E702"]  # компактные tensor accumulators в Taichi-кернелях
 
 [tool.black]
 line-length = 100

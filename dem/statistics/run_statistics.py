@@ -4,28 +4,29 @@
 Запуск: python run_statistics.py
 """
 
+import os
 import sys
 import time
-import os
-import numpy as np
+
 import matplotlib
-matplotlib.use('Agg')
+import numpy as np
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
 
+import taichi as ti
+
 from dem.collision_detector import SpatialHashCollisionDetector
 from dem.force_calculator import DirectDropletForceCalculator
 from dem.octree.force_tree import TreeDropletForceCalculator
 from dem.particle_generator import UniformDropletGenerator
-from dem.particle_state import DropletState
 from dem.post_processor import DropletPostProcessor
 from dem.solution import DropletSolution
 from dem.solver import EulerDropletSolver
-
-import taichi as ti
 
 ti.init(arch=ti.cpu, cpu_max_num_threads=16, default_fp=ti.f64)
 
@@ -33,18 +34,17 @@ ti.init(arch=ti.cpu, cpu_max_num_threads=16, default_fp=ti.f64)
 N = 100
 dt = 0.04
 t_stop = 100
-save_interval = 250          # каждые 10 сек при dt=0.04
+save_interval = 250  # каждые 10 сек при dt=0.04
 NUM_RUNS = 2
 
 snapshot_times = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]  # 11 точек
-histogram_times = [0, 20, 40, 60, 80, 100]                       # 6 точек для субплотов
+histogram_times = [0, 20, 40, 60, 80, 100]  # 6 точек для субплотов
 
 radii_range = np.array([2.5e-6, 7.5e-6])
 water_volume_content = 0.02
 
 box_size = np.cbrt(
-    (np.pi * N * np.sum(radii_range) * np.sum(np.square(radii_range)))
-    / (3 * water_volume_content)
+    (np.pi * N * np.sum(radii_range) * np.sum(np.square(radii_range))) / (3 * water_volume_content)
 )
 coord_range = (0, box_size)
 
@@ -82,22 +82,33 @@ def run_single_simulation(method, run_index):
     if method == "direct":
         force_calculator = DirectDropletForceCalculator(
             num_particles=num_particles,
-            eps_oil=eps_oil, eta_oil=eta_oil, eta_water=eta_water,
-            rho_water=rho_water, rho_oil=rho_oil, E=E,
-            L=box_size, boundary_mode=boundary_mode,
+            eps_oil=eps_oil,
+            eta_oil=eta_oil,
+            eta_water=eta_water,
+            rho_water=rho_water,
+            rho_oil=rho_oil,
+            E=E,
+            L=box_size,
+            boundary_mode=boundary_mode,
         )
     else:
         force_calculator = TreeDropletForceCalculator(
             num_particles=num_particles,
-            theta=theta, mpl=mpl,
-            eps_oil=eps_oil, eta_oil=eta_oil, eta_water=eta_water,
-            E=E, L=box_size,
+            theta=theta,
+            mpl=mpl,
+            eps_oil=eps_oil,
+            eta_oil=eta_oil,
+            eta_water=eta_water,
+            E=E,
+            L=box_size,
             periodic=(boundary_mode == "periodic"),
         )
 
     # 3. Остальные компоненты
     collision_detector = SpatialHashCollisionDetector(
-        num_particles=num_particles, L=box_size, boundary_mode=boundary_mode,
+        num_particles=num_particles,
+        L=box_size,
+        boundary_mode=boundary_mode,
     )
     solution = DropletSolution(
         initial_droplet_state=initial_state,
@@ -241,12 +252,12 @@ def plot_all_statistics(direct_results, tree_results):
         bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
         # Усреднённые гистограммы по 50 реализациям
-        direct_hists = np.array([
-            np.histogram(r, bins=bins, density=True)[0] for r in direct_radii_list
-        ])
-        tree_hists = np.array([
-            np.histogram(r, bins=bins, density=True)[0] for r in tree_radii_list
-        ])
+        direct_hists = np.array(
+            [np.histogram(r, bins=bins, density=True)[0] for r in direct_radii_list]
+        )
+        tree_hists = np.array(
+            [np.histogram(r, bins=bins, density=True)[0] for r in tree_radii_list]
+        )
 
         d_mean_h = direct_hists.mean(axis=0)
         d_std_h = direct_hists.std(axis=0)
@@ -254,11 +265,13 @@ def plot_all_statistics(direct_results, tree_results):
         t_std_h = tree_hists.std(axis=0)
 
         ax.plot(bin_centers, d_mean_h, color="tab:blue", linewidth=1.5, label="Direct")
-        ax.fill_between(bin_centers, d_mean_h - d_std_h, d_mean_h + d_std_h,
-                         color="tab:blue", alpha=0.2)
+        ax.fill_between(
+            bin_centers, d_mean_h - d_std_h, d_mean_h + d_std_h, color="tab:blue", alpha=0.2
+        )
         ax.plot(bin_centers, t_mean_h, color="tab:red", linewidth=1.5, label="Tree")
-        ax.fill_between(bin_centers, t_mean_h - t_std_h, t_mean_h + t_std_h,
-                         color="tab:red", alpha=0.2)
+        ax.fill_between(
+            bin_centers, t_mean_h - t_std_h, t_mean_h + t_std_h, color="tab:red", alpha=0.2
+        )
 
         ax.set_title(f"t = {t} сек")
         ax.set_xlabel("Радиус, мкм")
@@ -297,10 +310,14 @@ def plot_all_statistics(direct_results, tree_results):
     print(f"Сохранён: {RESULTS_DIR}/statistics_timing.png")
 
     # Печать статистики
-    print(f"\nDirect: {direct_times.mean():.1f} ± {direct_times.std():.1f} сек  "
-          f"(min={direct_times.min():.1f}, max={direct_times.max():.1f})")
-    print(f"Tree:   {tree_times.mean():.1f} ± {tree_times.std():.1f} сек  "
-          f"(min={tree_times.min():.1f}, max={tree_times.max():.1f})")
+    print(
+        f"\nDirect: {direct_times.mean():.1f} ± {direct_times.std():.1f} сек  "
+        f"(min={direct_times.min():.1f}, max={direct_times.max():.1f})"
+    )
+    print(
+        f"Tree:   {tree_times.mean():.1f} ± {tree_times.std():.1f} сек  "
+        f"(min={tree_times.min():.1f}, max={tree_times.max():.1f})"
+    )
     speedup = direct_times.mean() / tree_times.mean()
     print(f"Ускорение tree/direct: {speedup:.2f}x")
 
@@ -320,8 +337,10 @@ def main():
     for i in range(NUM_RUNS):
         result = run_single_simulation("direct", i)
         direct_results.append(result)
-        print(f"Direct {i+1}/{NUM_RUNS} done, elapsed: {result['elapsed_time']:.1f} сек, "
-              f"N_final={result['droplet_counts'][-1]}")
+        print(
+            f"Direct {i+1}/{NUM_RUNS} done, elapsed: {result['elapsed_time']:.1f} сек, "
+            f"N_final={result['droplet_counts'][-1]}"
+        )
 
     save_phase_results(direct_results, os.path.join(RESULTS_DIR, "statistics_direct.npz"))
 
@@ -333,8 +352,10 @@ def main():
     for i in range(NUM_RUNS):
         result = run_single_simulation("tree", i)
         tree_results.append(result)
-        print(f"Tree {i+1}/{NUM_RUNS} done, elapsed: {result['elapsed_time']:.1f} сек, "
-              f"N_final={result['droplet_counts'][-1]}")
+        print(
+            f"Tree {i+1}/{NUM_RUNS} done, elapsed: {result['elapsed_time']:.1f} сек, "
+            f"N_final={result['droplet_counts'][-1]}"
+        )
 
     save_phase_results(tree_results, os.path.join(RESULTS_DIR, "statistics_tree.npz"))
 

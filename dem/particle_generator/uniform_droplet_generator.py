@@ -1,14 +1,18 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import taichi as ti
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
 from ..particle_state import DropletState
 from .particle_generator_base import ParticleGenerator
 
+
 @ti.data_oriented
 class UniformDropletGenerator(ParticleGenerator):
-    def __init__(self, coord_range=(0, 10), radii_range=(1, 100), num_particles=1, minimum_distance=0):
+    def __init__(
+        self, coord_range=(0, 10), radii_range=(1, 100), num_particles=1, minimum_distance=0
+    ):
         """
         Инициализация генератора капель.
 
@@ -22,7 +26,7 @@ class UniformDropletGenerator(ParticleGenerator):
         self.coord_range = coord_range
         self.radii_range = radii_range
         self.minimum_distance = minimum_distance
-        self.droplet_state = None # Текущее состояние капель (объект DropletState)
+        self.droplet_state = None  # Текущее состояние капель (объект DropletState)
 
         # Создаем поля Taichi
         self.ti_n_of_overlaps = ti.field(dtype=ti.i32, shape=())
@@ -31,13 +35,12 @@ class UniformDropletGenerator(ParticleGenerator):
         self.ti_num_particles = ti.field(dtype=ti.i32, shape=())
         self.ti_radii = ti.field(dtype=ti.f64, shape=num_particles)
         self.ti_minimum_distance = ti.field(dtype=ti.f64, shape=())
-        self.ti_xs = ti.field(dtype=ti.f64, shape=num_particles)   
+        self.ti_xs = ti.field(dtype=ti.f64, shape=num_particles)
         self.ti_ys = ti.field(dtype=ti.f64, shape=num_particles)
         self.ti_zs = ti.field(dtype=ti.f64, shape=num_particles)
-        self.ti_xlims = ti.field(dtype=ti.f64, shape=(2, ))
-        self.ti_ylims = ti.field(dtype=ti.f64, shape=(2, ))
-        self.ti_zlims = ti.field(dtype=ti.f64, shape=(2, ))
-
+        self.ti_xlims = ti.field(dtype=ti.f64, shape=(2,))
+        self.ti_ylims = ti.field(dtype=ti.f64, shape=(2,))
+        self.ti_zlims = ti.field(dtype=ti.f64, shape=(2,))
 
     def generate(self):
         """
@@ -47,7 +50,7 @@ class UniformDropletGenerator(ParticleGenerator):
         """
 
         # Генерация массива радиусов и координат капель
-        #print(f"Генерация {self.num_particles} капель")
+        # print(f"Генерация {self.num_particles} капель")
         radii = np.random.uniform(self.radii_range[0], self.radii_range[1], size=self.num_particles)
         xs = np.random.uniform(self.coord_range[0], self.coord_range[1], size=self.num_particles)
         ys = np.random.uniform(self.coord_range[0], self.coord_range[1], size=self.num_particles)
@@ -67,7 +70,7 @@ class UniformDropletGenerator(ParticleGenerator):
         self.ti_xlims[1] = self.coord_range[1]
         self.ti_ylims[0] = self.coord_range[0]
         self.ti_ylims[1] = self.coord_range[1]
-        self.ti_zlims[0] = self.coord_range[0]  
+        self.ti_zlims[0] = self.coord_range[0]
         self.ti_zlims[1] = self.coord_range[1]
 
         # Устраняем пересечения
@@ -75,43 +78,48 @@ class UniformDropletGenerator(ParticleGenerator):
         while self.ti_n_of_overlaps[None] > 0:
             if attempts == 0:
                 raise ValueError("Не удалось устранить пересечения при генерациии капель!")
-            self.reseed_overlaping_droplets(self.ti_xs, 
-                                            self.ti_ys, 
-                                            self.ti_zs, 
-                                            self.ti_xlims, 
-                                            self.ti_ylims, 
-                                            self.ti_zlims, 
-                                            self.ti_radii,
-                                            self.ti_minimum_distance,
-                                            self.ti_num_particles, 
-                                            self.ti_n_of_overlaps,  
-                                            self.ti_is_overlapping,
-                                            self.ti_overlapping_droplets)
+            self.reseed_overlaping_droplets(
+                self.ti_xs,
+                self.ti_ys,
+                self.ti_zs,
+                self.ti_xlims,
+                self.ti_ylims,
+                self.ti_zlims,
+                self.ti_radii,
+                self.ti_minimum_distance,
+                self.ti_num_particles,
+                self.ti_n_of_overlaps,
+                self.ti_is_overlapping,
+                self.ti_overlapping_droplets,
+            )
             attempts -= 1
-            #print(f"Пересечений капель: {self.ti_n_of_overlaps[None]}")   
-            
+            # print(f"Пересечений капель: {self.ti_n_of_overlaps[None]}")
+
         # Копируем обратно в numpy
-        positions = np.stack((self.ti_xs.to_numpy(), self.ti_ys.to_numpy(), self.ti_zs.to_numpy()), axis=1)
+        positions = np.stack(
+            (self.ti_xs.to_numpy(), self.ti_ys.to_numpy(), self.ti_zs.to_numpy()), axis=1
+        )
 
         # Создаем и возвращаем объект состояния капель
         self.droplet_state = DropletState(positions, radii, 0)
         return self.droplet_state
 
     @ti.kernel
-    def reseed_overlaping_droplets(self,
-                         ti_x: ti.template(),
-                         ti_y: ti.template(),
-                         ti_z: ti.template(),
-                         ti_xlims: ti.template(),
-                         ti_ylims: ti.template(),
-                         ti_zlims: ti.template(),
-                         ti_radii: ti.template(),
-                         ti_minimum_distance: ti.template(),
-                         ti_num_particles: ti.template(),
-                         ti_n_of_overlaps: ti.template(),
-                         ti_is_overlapping: ti.template(),
-                         ti_overlapping_droplets: ti.template()):
-    
+    def reseed_overlaping_droplets(
+        self,
+        ti_x: ti.template(),
+        ti_y: ti.template(),
+        ti_z: ti.template(),
+        ti_xlims: ti.template(),
+        ti_ylims: ti.template(),
+        ti_zlims: ti.template(),
+        ti_radii: ti.template(),
+        ti_minimum_distance: ti.template(),
+        ti_num_particles: ti.template(),
+        ti_n_of_overlaps: ti.template(),
+        ti_is_overlapping: ti.template(),
+        ti_overlapping_droplets: ti.template(),
+    ):
 
         # Перегенерируем положения пересекающихся капель
         for ovrlap_ind in range(ti_n_of_overlaps[None]):
@@ -139,8 +147,8 @@ class UniformDropletGenerator(ParticleGenerator):
                 z2 = ti_z[dr2_ind]
                 radius2 = ti_radii[dr2_ind]
 
-                distance_squared = (x2-x1)**2 + (y2-y1)**2 + (z2-z1)**2
-                min_distance_squared = (radius1 + radius2 + ti_minimum_distance[None])**2
+                distance_squared = (x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2
+                min_distance_squared = (radius1 + radius2 + ti_minimum_distance[None]) ** 2
 
                 if distance_squared < min_distance_squared:
                     ti_is_overlapping[dr1_ind] = 1
@@ -155,8 +163,6 @@ class UniformDropletGenerator(ParticleGenerator):
                 new_n_of_overlaps = new_n_of_overlaps + 1
         ti_n_of_overlaps[None] = new_n_of_overlaps
 
-
-
     def save(self, filename):
         """
         Сохранение координат и радиусов капель в файл Excel.
@@ -170,13 +176,10 @@ class UniformDropletGenerator(ParticleGenerator):
         # Создаём DataFrame для хранения координат и радиусов
         positions = self.droplet_state.positions
         radii = self.droplet_state.radii
-        df = pd.DataFrame({
-            'X': positions[:, 0],
-            'Y': positions[:, 1],
-            'Z': positions[:, 2],
-            'Radius': radii
-        })
-        
+        df = pd.DataFrame(
+            {"X": positions[:, 0], "Y": positions[:, 1], "Z": positions[:, 2], "Radius": radii}
+        )
+
         # Сохранение в файл Excel
         df.to_excel(filename, index=False)
         print(f"Данные сохранены в файл {filename}.")
@@ -188,8 +191,8 @@ class UniformDropletGenerator(ParticleGenerator):
         :param filename: Имя файла
         """
         df = pd.read_excel(filename)
-        positions = np.array(df[['X', 'Y', 'Z']])
-        radii = np.array(df['Radius'])
+        positions = np.array(df[["X", "Y", "Z"]])
+        radii = np.array(df["Radius"])
         self.num_particles = len(positions)
         self.droplet_state = DropletState(positions, radii, 0)
         print(f"Данные загружены из файла {filename}.")
@@ -201,27 +204,26 @@ class UniformDropletGenerator(ParticleGenerator):
         if self.droplet_state is None:
             print("Сначала сгенерируйте капли с помощью метода generate().")
             return
-        
+
         self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(111, projection='3d')
+        self.ax = self.fig.add_subplot(111, projection="3d")
         self.ax.set_box_aspect([1, 1, 1])
         self.ax.set_xlim(*self.coord_range)
         self.ax.set_ylim(*self.coord_range)
         self.ax.set_zlim(*self.coord_range)
-        self.ax.set_title('Particle Distribution')
-
+        self.ax.set_title("Particle Distribution")
 
         # Создаем три окружности для каждой капли
         self.circles = []
-        for pos, r in zip(self.droplet_state.positions, self.droplet_state.radii):
+        for pos, r in zip(self.droplet_state.positions, self.droplet_state.radii, strict=False):
             circle_set = self.create_circle_set(pos, r)
             self.circles.append(circle_set)
             for circle in circle_set:
                 self.ax.add_collection3d(circle)
 
-        self.ax.set_xlabel('X Coordinate')
-        self.ax.set_ylabel('Y Coordinate')
-        self.ax.set_zlabel('Z Coordinate')
+        self.ax.set_xlabel("X Coordinate")
+        self.ax.set_ylabel("Y Coordinate")
+        self.ax.set_zlabel("Z Coordinate")
 
         plt.show()
 
@@ -240,30 +242,43 @@ class UniformDropletGenerator(ParticleGenerator):
         x = radius * np.cos(u) + position[0]
         y = radius * np.sin(u) + position[1]
         z = np.full_like(x, position[2])
-        circle_sets.append(Line3DCollection([list(zip(x, y, z))], colors='b', linewidths=1.5, alpha=0.7))
+        circle_sets.append(
+            Line3DCollection(
+                [list(zip(x, y, z, strict=False))], colors="b", linewidths=1.5, alpha=0.7
+            )
+        )
 
         # Окружность в плоскости XZ
         x = radius * np.cos(u) + position[0]
         y = np.full_like(x, position[1])
         z = radius * np.sin(u) + position[2]
-        circle_sets.append(Line3DCollection([list(zip(x, y, z))], colors='r', linewidths=1.5, alpha=0.7))
+        circle_sets.append(
+            Line3DCollection(
+                [list(zip(x, y, z, strict=False))], colors="r", linewidths=1.5, alpha=0.7
+            )
+        )
 
         # Окружность в плоскости YZ
         x = np.full_like(u, position[0])
         y = radius * np.cos(u) + position[1]
         z = radius * np.sin(u) + position[2]
-        circle_sets.append(Line3DCollection([list(zip(x, y, z))], colors='g', linewidths=1.5, alpha=0.7))
+        circle_sets.append(
+            Line3DCollection(
+                [list(zip(x, y, z, strict=False))], colors="g", linewidths=1.5, alpha=0.7
+            )
+        )
 
         return circle_sets
-    
+
     def print(self):
-        water_content = np.sum(self.droplet_state.radii**3 * np.pi * 4 / 3) / (self.coord_range[1]-self.coord_range[0])**3
+        water_content = (
+            np.sum(self.droplet_state.radii**3 * np.pi * 4 / 3)
+            / (self.coord_range[1] - self.coord_range[0]) ** 3
+        )
 
         print(f"\nКоличество капель: {self.num_particles}")
         print(f"Минимальный радиус капли: {np.min(self.droplet_state.radii)}")
         print(f"Максимальный радиус капли: {np.max(self.droplet_state.radii)}")
-        print(f"Средний радиус капли: {np.mean(self.droplet_state.radii)}" )
+        print(f"Средний радиус капли: {np.mean(self.droplet_state.radii)}")
         print(f"Объёмная доля воды: {water_content:.6f}")
         print(f"Размеры области: {self.coord_range}\n")
-
-

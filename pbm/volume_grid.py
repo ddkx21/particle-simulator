@@ -64,14 +64,17 @@ class VolumeGrid:
         if raw < 0 and not self._warned_clamp_low:
             logger.warning(
                 "VolumeGrid.bin_index: volume=%.3e < v_min=%.3e, зажимаем в bin 0",
-                volume, self.edges[0],
+                volume,
+                self.edges[0],
             )
             self._warned_clamp_low = True
         elif raw >= self.n_bins and not self._warned_clamp_high:
             logger.warning(
                 "VolumeGrid.bin_index: volume=%.3e > v_max=%.3e, зажимаем в bin %d. "
                 "Увеличьте v_max, иначе переростки молча накапливаются в крайнем бине.",
-                volume, self.edges[-1], self.n_bins - 1,
+                volume,
+                self.edges[-1],
+                self.n_bins - 1,
             )
             self._warned_clamp_high = True
         return max(0, min(raw, self.n_bins - 1))
@@ -81,13 +84,16 @@ class VolumeGrid:
         if not self._warned_clamp_high and np.any(raw >= self.n_bins):
             logger.warning(
                 "VolumeGrid.bin_indices: %d объёмов > v_max=%.3e, зажимаем в bin %d.",
-                int(np.sum(raw >= self.n_bins)), self.edges[-1], self.n_bins - 1,
+                int(np.sum(raw >= self.n_bins)),
+                self.edges[-1],
+                self.n_bins - 1,
             )
             self._warned_clamp_high = True
         if not self._warned_clamp_low and np.any(raw < 0):
             logger.warning(
                 "VolumeGrid.bin_indices: %d объёмов < v_min=%.3e, зажимаем в bin 0.",
-                int(np.sum(raw < 0)), self.edges[0],
+                int(np.sum(raw < 0)),
+                self.edges[0],
             )
             self._warned_clamp_low = True
         np.clip(raw, 0, self.n_bins - 1, out=raw)
@@ -104,7 +110,8 @@ class VolumeGrid:
             if not self._warned_clamp_high:
                 logger.warning(
                     "VolumeGrid.histogram: %d частиц с v > v_max=%.3e сложены в крайний бин.",
-                    n_overflow, self.edges[-1],
+                    n_overflow,
+                    self.edges[-1],
                 )
                 self._warned_clamp_high = True
         # Симметрично — частицы строго ниже v_min теряются: складываем в bin 0.
@@ -114,7 +121,8 @@ class VolumeGrid:
             if not self._warned_clamp_low:
                 logger.warning(
                     "VolumeGrid.histogram: %d частиц с v < v_min=%.3e сложены в bin 0.",
-                    n_underflow, self.edges[0],
+                    n_underflow,
+                    self.edges[0],
                 )
                 self._warned_clamp_low = True
         return counts.astype(np.float64)

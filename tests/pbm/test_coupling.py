@@ -1,19 +1,19 @@
 """Тесты pbm/coupling.py — DEMPBMCoupling."""
+
 from __future__ import annotations
 
 import numpy as np
 
-from pbm import VolumeGrid, PBMSolver
-from pbm.kernels import AnalyticalElectrostaticKernel
+from pbm import PBMSolver, VolumeGrid
 from pbm.coupling import DEMPBMCoupling
+from pbm.kernels import AnalyticalElectrostaticKernel
 
 
 def _make(coupling_interval: float = 1.0):
     g = VolumeGrid.from_radii_range(2.5e-6, 7.5e-6 * 5, 30)
     Q = AnalyticalElectrostaticKernel().build_matrix(g)
     solver = PBMSolver(g, Q, method="cell_average", domain_volume=1e-12)
-    coupling = DEMPBMCoupling(g, solver, domain_volume=1e-12,
-                              coupling_interval=coupling_interval)
+    coupling = DEMPBMCoupling(g, solver, domain_volume=1e-12, coupling_interval=coupling_interval)
     return g, solver, coupling
 
 

@@ -1,12 +1,21 @@
 import time
+
 import numpy as np
+
 from .solver_base import Solver
+
 
 class EulerDropletSolver(Solver):
 
-    def __init__(self, force_calculator, solution, post_processor,
-                 collision_detector=None, save_interval: int = 1,
-                 pbm_coupling=None):
+    def __init__(
+        self,
+        force_calculator,
+        solution,
+        post_processor,
+        collision_detector=None,
+        save_interval: int = 1,
+        pbm_coupling=None,
+    ):
         """
         Инициализация класса Solver.
 
@@ -27,7 +36,9 @@ class EulerDropletSolver(Solver):
 
         eta_oil = self.force_calculator.eta_oil
         eta_water = self.force_calculator.eta_water
-        self.stokes_factor = 2*np.pi*eta_oil*(2*eta_oil+3*eta_water)/(eta_oil+eta_water)
+        self.stokes_factor = (
+            2 * np.pi * eta_oil * (2 * eta_oil + 3 * eta_water) / (eta_oil + eta_water)
+        )
 
     def solve(self, dt, total_time):
         """
@@ -69,10 +80,12 @@ class EulerDropletSolver(Solver):
                 if percent != last_percent:
                     last_percent = percent
                     elapsed = time.time() - time_start
-                    print(f"{percent}%: Время: {t:.3f} из {t_end:.3f}, "
-                          f"Капель: {self.solution.num_particles}, "
-                          f"Прошло: {elapsed:.1f} сек",
-                          flush=True)
+                    print(
+                        f"{percent}%: Время: {t:.3f} из {t_end:.3f}, "
+                        f"Капель: {self.solution.num_particles}, "
+                        f"Прошло: {elapsed:.1f} сек",
+                        flush=True,
+                    )
 
                 # Прерывание симуляции, если окно было закрыто
                 if self.post_processor.stop_simulation:
@@ -97,12 +110,17 @@ class EulerDropletSolver(Solver):
                         break
 
                 # Вычисляем силы и скорости
-                if hasattr(self.force_calculator, 'calculate_forces_and_total_velocity'):
-                    forces, total_velocities = self.force_calculator.calculate_forces_and_total_velocity(
-                        positions, radii, stokes_factor=self.stokes_factor)
+                if hasattr(self.force_calculator, "calculate_forces_and_total_velocity"):
+                    forces, total_velocities = (
+                        self.force_calculator.calculate_forces_and_total_velocity(
+                            positions, radii, stokes_factor=self.stokes_factor
+                        )
+                    )
                     positions += total_velocities * dt
                 else:
-                    forces, convection_velocities = self.force_calculator.calculate_forces_and_convection(positions, radii)
+                    forces, convection_velocities = (
+                        self.force_calculator.calculate_forces_and_convection(positions, radii)
+                    )
                     migration_velocities = forces / (self.stokes_factor * radii[:, np.newaxis])
                     positions += (migration_velocities + convection_velocities) * dt
 
